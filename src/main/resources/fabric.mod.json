@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "mint",
+  "version": "${version}",
+  "name": "Mint",
+  "description": "Who actually reads this?",
+  "authors": [
+    "0tterware"
+  ],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/mint/icon.png",
+  "environment": "*",
+  "mixins": [
+    "mint.mixins.json"
+  ],
+  "depends": {
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
