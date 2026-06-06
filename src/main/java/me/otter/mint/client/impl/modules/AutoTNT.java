@@ -111,7 +111,7 @@ public class AutoTNT extends AddonModule {
                     if (!PlaceHelper.isEmpty(pos)) continue;
 
                     // fuck water
-                    if (Mint.mc.world.getBlockState(pos) instanceof Waterloggable) continue;
+                    if (Mint.mc.world.getBlockState(pos).getBlock() instanceof Waterloggable) continue;
                     var blockAtPos = WorldHelper.getBlock(pos);
                     if (blockAtPos == Blocks.WATER || blockAtPos == Blocks.LAVA || blockAtPos == Blocks.BUBBLE_COLUMN) continue;
 

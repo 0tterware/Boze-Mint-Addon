@@ -7,6 +7,7 @@ import me.otter.mint.Mint;
 import net.minecraft.util.Identifier;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class CustomCapeSource extends CapeSource {
         Mint.LOGGER.debug("Attempting to load cape for {} from {}", profile.name(), urlString);
 
         try {
-            return new URL(urlString);
+            return URI.create(urlString).toURL();
         } catch (MalformedURLException e) {
             Mint.LOGGER.error("Malformed URL for cape: {}", urlString, e);
             return null;

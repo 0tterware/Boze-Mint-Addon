@@ -34,8 +34,8 @@ public class FeatureManager {
             case AddonCommand command -> Mint.INSTANCE.dispatcher.registerCommand(command);
             case AddonModule module -> Mint.INSTANCE.modules.add(module);
             case ClientModuleExtension extension -> Mint.INSTANCE.extensions.add(extension);
-            case null, default ->
-                    Mint.LOGGER.warn("Unsupported type for registration: {}", registrable.getClass().getName());
+            case null -> Mint.LOGGER.warn("Cannot register null feature");
+            default -> Mint.LOGGER.warn("Unsupported type for registration: {}", registrable.getClass().getName());
         }
     }
 

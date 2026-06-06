@@ -13,6 +13,6 @@ public abstract class MinecraftClientMixin {
     @Inject(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MinecraftClient;instance:Lnet/minecraft/client/MinecraftClient;"))
     private void onInit(CallbackInfo ci) {
         BozeInstance.INSTANCE.registerAddon(Mint.INSTANCE);
-        Mint.LOGGER.info("Registering " + Mint.NAME + " " + Mint.VERSION);
+        Mint.LOGGER.info("Registering {} {}", Mint.NAME, Mint.VERSION);
     }
 }

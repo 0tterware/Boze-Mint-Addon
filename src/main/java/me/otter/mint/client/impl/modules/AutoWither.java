@@ -60,7 +60,6 @@ public class AutoWither extends AddonModule {
 
     private BlockPos basePreview = null;
     private WitherLayout layoutPreview = null;
-    private BlockPos currentPos = null;
 
     public AutoWither() {
         super("AutoWither", "Automatically summons Withers.");
@@ -83,7 +82,6 @@ public class AutoWither extends AddonModule {
         skullQueue.clear();
         basePreview = null;
         layoutPreview = null;
-        currentPos = null;
     }
 
     @EventHandler
@@ -145,7 +143,6 @@ public class AutoWither extends AddonModule {
         final double r = placeRange.getValue();
         final int ri = (int) Math.ceil(r);
         final double r2 = r * r;
-        final double minR2 = minRange.getValue() * minRange.getValue();
         final BlockPos center = Mint.mc.player.getBlockPos();
         final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
 
@@ -195,7 +192,7 @@ public class AutoWither extends AddonModule {
     private boolean withinRanges(BlockPos base, WitherLayout l) {
         final double r2 = placeRange.getValue() * placeRange.getValue();
         final double minR2 = minRange.getValue() * minRange.getValue();
-        final Vec3d eye = Mint.mc.player.getEntityPos().add(0, Mint.mc.player.getEyeHeight(Mint.mc.player.getPose()), 0);
+        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
 
         List<BlockPos> all = new ArrayList<>(l.getSoulOffsets(base));
         all.addAll(l.getSkullOffsets(base));
@@ -248,7 +245,6 @@ public class AutoWither extends AddonModule {
         skullQueue = new ArrayList<>(layoutPreview.getSkullOffsets(basePreview));
         summoning = true;
         ticksSincePlace = 0;
-        currentPos = null;
 
         if (debug.getValue()) {
             ChatHelper.sendMsg(getName(), "Starting summon at " + basePreview.toShortString());
@@ -302,20 +298,19 @@ public class AutoWither extends AddonModule {
         };
 
         if (rotate.getValue()) {
-            Vec3d eye = Mint.mc.player.getEntityPos().add(0, Mint.mc.player.getEyeHeight(Mint.mc.player.getPose()), 0);
+            Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
             float[] rot = MathHelper.calculateRotation(eye, hit.getPos());
             event.addInteraction(new Interaction(placeAction, rot[0], rot[1]));
         } else {
             event.addInteraction(new Interaction(placeAction));
         }
 
-        currentPos = next;
         ticksSincePlace = 0;
     }
 
     private BlockPos pickNearestPlaceable(List<BlockPos> pool, boolean skullPhase) {
         if (pool.isEmpty()) return null;
-        Vec3d eye = Mint.mc.player.getEntityPos().add(0, Mint.mc.player.getEyeHeight(Mint.mc.player.getPose()), 0);
+        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
 
         return pool.stream()
                 .sorted(Comparator.comparingDouble(p -> sqDistToCenter(eye, p)))
@@ -355,16 +350,6 @@ public class AutoWither extends AddonModule {
             }
         }
         return null;
-    }
-
-    private boolean anyPlaceableRemaining() {
-        for (BlockPos p : sandQueue) {
-            if (canPlaceSoulAt(p)) return true;
-        }
-        for (BlockPos p : skullQueue) {
-            if (canPlaceSkullAt(p)) return true;
-        }
-        return false;
     }
 
     private int resolveSlotFor(boolean skull) {

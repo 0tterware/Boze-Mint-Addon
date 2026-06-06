@@ -25,7 +25,7 @@ public class Mint extends Addon {
     public static final Logger LOGGER = LogManager.getLogger();
     public static final IEventBus EVENT_BUS = new EventBus();
 
-    public static Mint INSTANCE = new Mint();
+    public static final Mint INSTANCE = new Mint();
     public static MinecraftClient mc;
 
     public static ClientColor CLIENT_COLOR = ColorMaker.staticColor(60, 170, 120);
