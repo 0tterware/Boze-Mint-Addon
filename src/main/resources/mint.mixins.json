@@ -4,6 +4,7 @@
   "package": "me.otter.mint.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "GameRendererMixin",
     "MinecraftClientMixin",
     "TntMinecartEntityRendererMixin"
   ],

@@ -6,6 +6,7 @@ import dev.boze.api.client.module.ClientModuleExtension;
 import me.otter.mint.Mint;
 import me.otter.mint.client.impl.commands.CoinFlip;
 import me.otter.mint.client.impl.commands.ModulesCommand;
+import me.otter.mint.client.impl.extentions.ViewModelExtension;
 import me.otter.mint.client.impl.extentions.WorldESPExtension;
 import me.otter.mint.client.impl.extentions.WorldTweaksExtension;
 import me.otter.mint.client.impl.modules.AutoTNT;
@@ -21,6 +22,7 @@ public class FeatureManager {
         // Extensions:
         register(new WorldTweaksExtension());
         register(new WorldESPExtension());
+        register(new ViewModelExtension());
 
         // Commands:
         register(new CoinFlip());
