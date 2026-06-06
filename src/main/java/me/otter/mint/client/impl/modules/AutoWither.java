@@ -141,6 +141,8 @@ public class AutoWither extends AddonModule {
         final BlockPos center = Mint.mc.player.getBlockPos();
         final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
 
+        if (!anySolidInRange(center, ri, r2, eye)) return false;
+
         List<Cand> cands = new ArrayList<>();
 
         for (int dx = -ri; dx <= ri; dx++) {
@@ -181,6 +183,19 @@ public class AutoWither extends AddonModule {
     }
 
     private record Cand(BlockPos base, WitherLayout layout, List<BlockPos> souls, double metric) {}
+
+    private static boolean anySolidInRange(BlockPos center, int ri, double r2, Vec3d eye) {
+        for (int dx = -ri; dx <= ri; dx++) {
+            for (int dy = -ri; dy <= ri; dy++) {
+                for (int dz = -ri; dz <= ri; dz++) {
+                    BlockPos p = center.add(dx, dy, dz);
+                    if (sqDistToCenter(eye, p) > r2) continue;
+                    if (!WorldHelper.isReplaceable(p)) return true;
+                }
+            }
+        }
+        return false;
+    }
 
     private static boolean withinRanges(Vec3d eye, List<BlockPos> souls, List<BlockPos> skulls, double r2, double minR2) {
         for (BlockPos p : souls) {

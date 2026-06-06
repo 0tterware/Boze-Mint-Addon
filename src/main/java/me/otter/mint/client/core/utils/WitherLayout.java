@@ -163,15 +163,28 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
         List<WitherLayout> validLayouts = new ArrayList<>(WITHER_LAYOUTS.length);
 
         for (WitherLayout layout : WITHER_LAYOUTS) {
-            if (!allReplaceableAndEmpty(layout.getSoulOffsets(base))) continue;
+            List<BlockPos> souls = layout.getSoulOffsets(base);
+
+            if (!allReplaceableAndEmpty(souls)) continue;
 
             if (!allReplaceableAndEmpty(layout.getSkullOffsets(base))) continue;
 
             if (!allAir(layout.getAirOffsets(base))) continue;
 
+            if (!hasSupport(souls)) continue;
+
             validLayouts.add(layout);
         }
         return validLayouts;
+    }
+
+    private static boolean hasSupport(List<BlockPos> positions) {
+        for (BlockPos p : positions) {
+            for (Direction dir : Direction.values()) {
+                if (!WorldHelper.isReplaceable(p.offset(dir))) return true;
+            }
+        }
+        return false;
     }
 
     private static boolean allReplaceableAndEmpty(List<BlockPos> positions) {
