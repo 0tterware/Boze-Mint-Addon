@@ -22,10 +22,10 @@ public class CoinFlip extends AddonCommand {
             boolean rand = random.nextBoolean();
 
             if (rand) {
-                String msg = String.format("Hey guys! %d, %d, %d",
-                        (int) Mint.mc.player.getX(),
-                        (int) Mint.mc.player.getY(),
-                        (int) Mint.mc.player.getZ()
+                String msg = String.format("Hey guys! %d, %d, %d", 0, 0, 0
+                        // (int) Mint.mc.player.getX(),
+                        // (int) Mint.mc.player.getY(),
+                        // (int) Mint.mc.player.getZ()
                 );
                 Mint.mc.getNetworkHandler().sendChatMessage(msg);
             } else {
