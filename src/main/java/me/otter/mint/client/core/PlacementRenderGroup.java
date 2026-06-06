@@ -14,14 +14,14 @@ public class PlacementRenderGroup {
 
     public final ToggleOption enabled;
     public final ColorOption color;
-    public final SliderOption duration;
-    public final SliderOption fade;
-    public final SliderOption grow;
-    public final SliderOption shrink;
     public final ToggleOption shader;
+    public final SliderOption renderTicks;
+    public final SliderOption animOpacity;
+    public final SliderOption animGrow;
+    public final SliderOption animShrink;
 
     public PlacementRenderGroup(BaseModule owner) {
-        this(owner, "Placements", null);
+        this(owner, "Render", null);
     }
 
     public PlacementRenderGroup(BaseModule owner, String name) {
@@ -30,12 +30,12 @@ public class PlacementRenderGroup {
 
     public PlacementRenderGroup(BaseModule owner, String name, Option<?> parent) {
         this.enabled = new ToggleOption(owner, name, "Render blocks as they are placed.", true, parent);
-        this.color = new ColorOption(owner, "Color", "Color of the placement render.", Mint.CLIENT_COLOR, 0.25f, 1.0f, enabled);
-        this.duration = new SliderOption(owner, "Duration", "How long each placement is shown.", 1000, 50, 5000, 50, enabled);
-        this.fade = new SliderOption(owner, "Fade", "Portion of the duration spent fading out.", 1.0, 0.0, 1.0, 0.05, enabled);
-        this.grow = new SliderOption(owner, "Grow", "Portion of the duration spent growing in.", 0.0, 0.0, 1.0, 0.05, enabled);
-        this.shrink = new SliderOption(owner, "Shrink", "Portion of the duration spent shrinking out (0 = none).", 0.0, 0.0, 1.0, 0.05, enabled);
+        this.color = new ColorOption(owner, "Color", "Color for placement render", Mint.CLIENT_COLOR, 0.25f, 1.0f, enabled);
         this.shader = new ToggleOption(owner, "Shader", "Render through the shader instead of plain boxes.", false, enabled);
+        this.renderTicks = new SliderOption(owner, "RenderTicks", "Amount of ticks to render placement for", 20, 0, 20, 1, enabled);
+        this.animOpacity = new SliderOption(owner, "AnimOpacity", "Opacity during animation (0 = no fade, 1 = fade over entire time)", 1.0, 0.0, 1.0, 0.05, enabled);
+        this.animGrow = new SliderOption(owner, "AnimGrow", "Grow animation duration (starts at beginning)", 0.0, 0.0, 1.0, 0.05, enabled);
+        this.animShrink = new SliderOption(owner, "AnimShrink", "Shrink animation duration (starts near the end)", 0.0, 0.0, 1.0, 0.05, enabled);
     }
 
     public void render(BlockPos pos) {
@@ -45,13 +45,13 @@ public class PlacementRenderGroup {
         PlaceRenderer.addPlacement(new PlaceRenderer.PlacementRecord(
                 pos,
                 System.currentTimeMillis(),
-                duration.getValue().longValue(),
+                renderTicks.getValue().longValue() * 50L,
                 value.color,
                 value.fillOpacity,
                 value.outlineOpacity,
-                fade.getValue().floatValue(),
-                grow.getValue().floatValue(),
-                shrink.getValue().floatValue(),
+                animOpacity.getValue().floatValue(),
+                animGrow.getValue().floatValue(),
+                animShrink.getValue().floatValue(),
                 shader.getValue()
         ));
     }
