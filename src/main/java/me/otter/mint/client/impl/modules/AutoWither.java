@@ -2,13 +2,9 @@ package me.otter.mint.client.impl.modules;
 
 import dev.boze.api.addon.AddonModule;
 import dev.boze.api.event.EventInteract;
-import dev.boze.api.event.EventWorldRender;
-import dev.boze.api.option.ColorOption;
 import dev.boze.api.option.ModeOption;
 import dev.boze.api.option.SliderOption;
 import dev.boze.api.option.ToggleOption;
-import dev.boze.api.render.ColorMaker;
-import dev.boze.api.render.WorldDrawer;
 import dev.boze.api.utility.ChatHelper;
 import dev.boze.api.utility.EntityHelper;
 import dev.boze.api.utility.MathHelper;
@@ -23,7 +19,6 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 
@@ -46,8 +41,6 @@ public class AutoWither extends AddonModule {
     private final ToggleOption rotate = new ToggleOption(this, "Rotate", "Rotate towards target before placing.", true);
     private final ToggleOption strictDirection = new ToggleOption(this, "StrictDir", "Use stricter raycast direction.", true);
     private final ModeOption<ToggleableSwapType> swapMode = new ModeOption<>(this, "SwapMode", "Swap style for items.", ToggleableSwapType.Silent);
-    private final ToggleOption render = new ToggleOption(this, "Render", "Render the blocks we still need to place.", true);
-    private final ColorOption renderColor = new ColorOption(this, "RenderColor", "Color for preview blocks.", ColorMaker.staticColor(0, 255, 255), 0.2f, 0.6f);
     private final ToggleOption debug = new ToggleOption(this, "Debug", "Debug messages.", false);
     private final PlacementRenderGroup placements = new PlacementRenderGroup(this);
 
@@ -364,23 +357,5 @@ public class AutoWither extends AddonModule {
         for (BlockPos p : skulls) sum += sqDistToCenter(eye, p);
         int count = souls.size() + skulls.size();
         return count == 0 ? 0 : sum / count;
-    }
-
-    @EventHandler
-    private void onWorldRender(EventWorldRender event) {
-        if (!render.getValue()) return;
-        if (Mint.mc.world == null || Mint.mc.player == null) return;
-        if (!summoning) return;
-
-        WorldDrawer.start();
-        for (BlockPos p : sandQueue) drawBox(p);
-        for (BlockPos p : skullQueue) drawBox(p);
-        WorldDrawer.draw(event.matrices);
-    }
-
-    private void drawBox(BlockPos p) {
-        Box bb = new Box(p);
-        WorldDrawer.boxSides(renderColor.getValue(), bb);
-        WorldDrawer.boxLines(renderColor.getValue(), bb);
     }
 }
