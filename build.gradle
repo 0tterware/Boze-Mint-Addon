@@ -95,4 +95,5 @@ publishing {
 
 tasks.register("runBoze", ClientProductionRunTask) {
     mods.from configurations.modRuntimeOnly
+    outputs.upToDateWhen { false }
 }
