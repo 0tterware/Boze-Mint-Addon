@@ -11,7 +11,7 @@ An addon for the [Boze](https://boze.dev) Minecraft client.
 **Extensions**
 - `WorldESP` - renders TNT fuse timers
 - `WorldTweaks` - tints TNT blinking
-- `ViewModel` - adds a Hand FOV
+- `ViewModel` - adds a Hand FOV and Swing Progress
 
 **Commands**
 - `mint-coinflip` - flip a coin to test your luck.
