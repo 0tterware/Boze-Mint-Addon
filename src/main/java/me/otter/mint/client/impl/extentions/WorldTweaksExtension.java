@@ -13,6 +13,7 @@ public class WorldTweaksExtension extends ClientModuleExtension {
 
     public ToggleOption glintParentToggle = new ToggleOption(parent, "Enchant Glint", "Recolor the enchantment glint", false);
     public ColorOption glintColor = new ColorOption(parent, "Color", "Color of the enchantment glint", ColorMaker.staticColor(255, 50, 255), 0.2f, 0.6f, glintParentToggle);
+    public ToggleOption glintAlways = new ToggleOption(parent, "Always", "Render the glint on all items, even unenchanted ones", false, glintParentToggle);
 
     public WorldTweaksExtension() {
         super(ModuleManager.getClientModule("WorldTweaks"));
