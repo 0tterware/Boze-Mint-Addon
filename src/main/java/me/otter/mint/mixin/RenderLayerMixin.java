@@ -14,6 +14,11 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 @Mixin(RenderLayer.class)
 public abstract class RenderLayerMixin {
 
+    // because why would it be straight forward...
+    private static final float GLINT_TEX_R = 167.0f / 255.0f;
+    private static final float GLINT_TEX_G = 85.0f / 255.0f;
+    private static final float GLINT_TEX_B = 255.0f / 255.0f;
+
     @ModifyArg(
         method = "draw",
         at = @At(
@@ -34,6 +39,11 @@ public abstract class RenderLayerMixin {
         }
 
         ClientColor color = ext.glintColor.getValue().color;
-        return new Vector4f(color.getRed() / 255.0f, color.getGreen() / 255.0f, color.getBlue() / 255.0f, 1.0f);
+        return new Vector4f(
+            (color.getRed() / 255.0f) / GLINT_TEX_R,
+            (color.getGreen() / 255.0f) / GLINT_TEX_G,
+            (color.getBlue() / 255.0f) / GLINT_TEX_B,
+            1.0f
+        );
     }
 }
