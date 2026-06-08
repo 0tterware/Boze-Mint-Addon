@@ -19,7 +19,7 @@ An addon for the [Boze](https://boze.dev) Minecraft client.
   - `Main Hand Progress` / `Off Hand Progress`
 - `AutoCrystal`
   - `TargetRender`
-- `Options
+- `Options`
   - `InstantPrefix`
   - `CmdHighlight`
 
