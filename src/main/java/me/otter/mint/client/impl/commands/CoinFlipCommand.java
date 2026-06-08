@@ -8,11 +8,11 @@ import net.minecraft.command.CommandSource;
 
 import java.util.Random;
 
-public class CoinFlip extends AddonCommand {
+public class CoinFlipCommand extends AddonCommand {
 
     private final Random random = new Random();
 
-    public CoinFlip() {
+    public CoinFlipCommand() {
         super(Mint.ID+"-coinflip", "See if luck is on your side.");
     }
 

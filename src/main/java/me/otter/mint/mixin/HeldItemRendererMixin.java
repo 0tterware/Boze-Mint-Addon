@@ -1,6 +1,6 @@
 package me.otter.mint.mixin;
 
-import me.otter.mint.client.core.FeatureManager;
+import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.impl.extentions.ViewModelExtension;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.item.HeldItemRenderer;

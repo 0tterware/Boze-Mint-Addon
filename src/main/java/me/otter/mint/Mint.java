@@ -5,7 +5,7 @@ import dev.boze.api.addon.Addon;
 import dev.boze.api.render.ClientColor;
 import dev.boze.api.render.ColorMaker;
 import dev.boze.api.utility.cape.CapesManager;
-import me.otter.mint.client.core.FeatureManager;
+import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.core.cape.CustomCapeSource;
 import meteordevelopment.orbit.EventBus;
 import meteordevelopment.orbit.IEventBus;
@@ -28,7 +28,9 @@ public class Mint extends Addon {
     public static final Mint INSTANCE = new Mint();
     public static MinecraftClient mc;
 
-    public static ClientColor CLIENT_COLOR = ColorMaker.staticColor(60, 170, 120);
+    public static final ClientColor CLIENT_COLOR = ColorMaker.staticColor(60, 170, 120);
+    public static final float MAIN_FILL_OPACITY = 0.4f;
+    public static final float MAIN_OUTLINE_OPACITY = 0.8f;
 
     public Mint() {
         super(ID, NAME, DESCRIPTION, VERSION);

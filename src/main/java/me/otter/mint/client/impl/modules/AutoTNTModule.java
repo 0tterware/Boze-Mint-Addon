@@ -9,7 +9,7 @@ import dev.boze.api.utility.MathHelper;
 import dev.boze.api.utility.WorldHelper;
 import dev.boze.api.utility.interaction.*;
 import me.otter.mint.Mint;
-import me.otter.mint.client.core.PlacementRenderGroup;
+import me.otter.mint.client.core.feature.RenderSettings;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Blocks;
 import net.minecraft.util.Hand;
@@ -19,7 +19,7 @@ import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
 
-public class AutoTNT extends AddonModule {
+public class AutoTNTModule extends AddonModule {
 
     private enum SortMode { Closest, Furthest, Random }
 
@@ -37,7 +37,7 @@ public class AutoTNT extends AddonModule {
     private final ToggleOption autoDisable = new ToggleOption(this, "AutoDisable", "Turn module off if no TNT is found.", false);
     private final ToggleOption onlyStill = new ToggleOption(this, "OnlyStill", "Don't place while moving.", false);
     private final ToggleOption debug = new ToggleOption(this, "Debug", "Debug messages in chat/log.", false);
-    private final PlacementRenderGroup placements = new PlacementRenderGroup(this);
+    private final RenderSettings placements = new RenderSettings(this);
 
     private static final long PLACEMENT_MEMORY_MS = 2500L;
 
@@ -46,7 +46,7 @@ public class AutoTNT extends AddonModule {
     private final Map<BlockPos, Long> recentPlacements = new HashMap<>();
     private final Random rng = new Random();
 
-    public AutoTNT() {
+    public AutoTNTModule() {
         super("AutoTNT", "Automatically places TNT around you.");
     }
 

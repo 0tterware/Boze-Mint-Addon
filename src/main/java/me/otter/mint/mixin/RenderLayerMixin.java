@@ -1,7 +1,7 @@
 package me.otter.mint.mixin;
 
 import dev.boze.api.render.ClientColor;
-import me.otter.mint.client.core.FeatureManager;
+import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.impl.extentions.WorldTweaksExtension;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;

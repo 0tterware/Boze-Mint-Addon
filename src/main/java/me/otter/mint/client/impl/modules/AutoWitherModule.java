@@ -10,7 +10,7 @@ import dev.boze.api.utility.EntityHelper;
 import dev.boze.api.utility.MathHelper;
 import dev.boze.api.utility.WorldHelper;
 import dev.boze.api.utility.interaction.*;
-import me.otter.mint.client.core.PlacementRenderGroup;
+import me.otter.mint.client.core.feature.RenderSettings;
 import me.otter.mint.client.core.utils.WitherLayout;
 import me.otter.mint.Mint;
 import meteordevelopment.orbit.EventHandler;
@@ -24,7 +24,7 @@ import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
 
-public class AutoWither extends AddonModule {
+public class AutoWitherModule extends AddonModule {
 
     private enum RunMode { Once, Continuous }
     private enum SortMode { Closest, Furthest, Random }
@@ -42,7 +42,7 @@ public class AutoWither extends AddonModule {
     private final ToggleOption strictDirection = new ToggleOption(this, "StrictDir", "Use stricter raycast direction.", true);
     private final ModeOption<ToggleableSwapType> swapMode = new ModeOption<>(this, "SwapMode", "Swap style for items.", ToggleableSwapType.Silent);
     private final ToggleOption debug = new ToggleOption(this, "Debug", "Debug messages.", false);
-    private final PlacementRenderGroup placements = new PlacementRenderGroup(this);
+    private final RenderSettings placements = new RenderSettings(this);
 
     private static final int STALL_LIMIT = 40;
 
@@ -58,7 +58,7 @@ public class AutoWither extends AddonModule {
     private BlockPos basePreview = null;
     private WitherLayout layoutPreview = null;
 
-    public AutoWither() {
+    public AutoWitherModule() {
         super("AutoWither", "Automatically summons Withers.");
     }
 

@@ -1,6 +1,6 @@
 package me.otter.mint.mixin;
 
-import me.otter.mint.client.core.FeatureManager;
+import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.impl.extentions.WorldTweaksExtension;
 import net.minecraft.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
