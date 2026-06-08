@@ -9,7 +9,8 @@
     "ItemStackMixin",
     "MinecraftClientMixin",
     "RenderLayerMixin",
-    "TntMinecartEntityRendererMixin"
+    "TntMinecartEntityRendererMixin",
+    "ChatScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

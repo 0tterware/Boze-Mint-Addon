@@ -7,9 +7,7 @@ import me.otter.mint.Mint;
 import me.otter.mint.client.impl.commands.CapeSourceCommand;
 import me.otter.mint.client.impl.commands.CoinFlipCommand;
 import me.otter.mint.client.impl.commands.ModulesCommand;
-import me.otter.mint.client.impl.extentions.ViewModelExtension;
-import me.otter.mint.client.impl.extentions.WorldESPExtension;
-import me.otter.mint.client.impl.extentions.WorldTweaksExtension;
+import me.otter.mint.client.impl.extentions.*;
 import me.otter.mint.client.impl.modules.AutoTNTModule;
 import me.otter.mint.client.impl.modules.AutoWitherModule;
 
@@ -24,13 +22,14 @@ public class FeatureManager {
         register(new WorldTweaksExtension());
         register(new WorldESPExtension());
         register(new ViewModelExtension());
+        register(new AutoCrystalExtension());
+        register(new OptionsExtension());
 
         // Commands:
         register(new CoinFlipCommand());
         register(new ModulesCommand());
         register(new CapeSourceCommand());
 
-        //TODO: instantprefix when we have keyevents
     }
 
     public static void register(Object registrable) {

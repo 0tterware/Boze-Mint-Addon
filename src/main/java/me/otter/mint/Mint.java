@@ -7,6 +7,7 @@ import dev.boze.api.render.ColorMaker;
 import dev.boze.api.utility.cape.CapesManager;
 import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.core.cape.CustomCapeSource;
+import me.otter.mint.client.impl.listeners.InstantPrefixListener;
 import meteordevelopment.orbit.EventBus;
 import meteordevelopment.orbit.IEventBus;
 import net.fabricmc.loader.api.FabricLoader;
@@ -48,7 +49,10 @@ public class Mint extends Addon {
 
         // Register all features
         FeatureManager.registerFeatures();
-        CapesManager.addSource(new CustomCapeSource(ID));
+        CapesManager.addSource(new CustomCapeSource("Mint Cape Provider"));
+
+        // Always-active listeners under boze event bus
+        BozeInstance.INSTANCE.subscribe(new InstantPrefixListener());
         
         // Maybe change later if launch failed
         LOGGER.info("Successfully initialized {}", name);
