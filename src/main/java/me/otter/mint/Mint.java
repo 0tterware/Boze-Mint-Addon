@@ -49,7 +49,7 @@ public class Mint extends Addon {
 
         // Register all features
         FeatureManager.registerFeatures();
-        CapesManager.addSource(new CustomCapeSource("Mint Cape Provider"));
+        CapesManager.addSource(new CustomCapeSource(ID));
 
         // Always-active listeners under boze event bus
         BozeInstance.INSTANCE.subscribe(new InstantPrefixListener());

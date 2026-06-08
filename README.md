@@ -15,7 +15,7 @@ An addon for the [Boze](https://boze.dev) Minecraft client.
   - `Tnt tint`
   - `Enchant Glint tint and always option`
 - `ViewModel`
-  - `FOV forr first person`
+  - `FOV for first person`
   - `Main Hand Progress` / `Off Hand Progress`
 - `AutoCrystal`
   - `TargetRender`
