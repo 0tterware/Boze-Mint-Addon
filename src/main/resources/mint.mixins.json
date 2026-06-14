@@ -8,6 +8,7 @@
     "HeldItemRendererMixin",
     "ItemStackMixin",
     "MinecraftClientMixin",
+    "OverlayTextureMixin",
     "RenderLayerMixin",
     "TntMinecartEntityRendererMixin",
     "ChatScreenMixin"
