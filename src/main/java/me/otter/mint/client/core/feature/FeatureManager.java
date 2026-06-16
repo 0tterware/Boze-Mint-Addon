@@ -23,6 +23,7 @@ public class FeatureManager {
         register(new WorldESPExtension());
         register(new ViewModelExtension());
         register(new AutoCrystalExtension());
+        register(new HandTweaksExtension());
         register(new OptionsExtension());
 
         // Commands:
