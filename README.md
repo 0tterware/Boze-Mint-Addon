@@ -5,6 +5,7 @@ An addon for the [Boze](https://boze.dev) Minecraft client.
 ## Features
 
 **Modules**
+- `AnchorAura` - automatically attacks enemies using respawn anchor explosions
 - `AutoTNT` - automatically places TNT around you
 - `AutoWither` - automatically builds withers
 

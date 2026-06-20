@@ -8,6 +8,7 @@ import me.otter.mint.client.impl.commands.CapeSourceCommand;
 import me.otter.mint.client.impl.commands.CoinFlipCommand;
 import me.otter.mint.client.impl.commands.ModulesCommand;
 import me.otter.mint.client.impl.extentions.*;
+import me.otter.mint.client.impl.modules.AnchorAuraModule;
 import me.otter.mint.client.impl.modules.AutoTNTModule;
 import me.otter.mint.client.impl.modules.AutoWitherModule;
 
@@ -15,6 +16,7 @@ public class FeatureManager {
 
     public static void registerFeatures() {
         // Modules:
+        register(new AnchorAuraModule());
         register(new AutoTNTModule());
         register(new AutoWitherModule());
 
