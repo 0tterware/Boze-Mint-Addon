@@ -14,6 +14,9 @@ An addon for the [Boze](https://boze.dev) Minecraft client.
 - `WorldTweaks`
   - `Tnt tint`
   - `Enchant Glint tint and always option`
+  - `Damage overlay tint`
+- `HandTweaks`
+  - `NoInterrupt for swing animation`
 - `ViewModel`
   - `FOV for first person`
   - `Main Hand Progress` / `Off Hand Progress`
