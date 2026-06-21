@@ -324,6 +324,7 @@ public class AnchorAuraModule extends AddonModule {
         BlockHitResult bestPlaceHit = null;
         int bestCharges = -1;
         double bestScore = -1;
+        double curScore = -1;
 
         for (LivingEntity target : targets) {
             BlockPos center = target.getBlockPos();
@@ -361,13 +362,18 @@ public class AnchorAuraModule extends AddonModule {
 
                         double score = dmg;
                         if (anchor) score += charges >= 1 ? CHARGED_ANCHOR_BONUS : EXISTING_ANCHOR_BONUS;
-                        if (pos.equals(lastSpot)) score += stickBonus.getValue();
+                        if (pos.equals(workSpot)) curScore = score;
                         if (score <= bestScore) continue;
                         bestScore = score; bestPos = pos; bestTgt = target;
                         bestPlaceHit = placeHit; bestCharges = charges;
                     }
                 }
             }
+        }
+
+        if (curScore >= 0 && bestPos != null && !bestPos.equals(workSpot) && bestScore <= curScore + stickBonus.getValue()) {
+            lastSpot = workSpot;
+            return true;
         }
 
         if (bestPos == null) return false;
