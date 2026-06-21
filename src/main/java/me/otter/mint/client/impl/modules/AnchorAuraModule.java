@@ -69,7 +69,7 @@ public class AnchorAuraModule extends AddonModule {
     private final ModeOption<AimPoint> aimPoint = new ModeOption<>(this, "AimPoint", "Where on the anchor to aim.", AimPoint.Center, rotate::getValue, rotate);
 
     // Targeting
-    private final ParentOption targeting = new ParentOption(this, "Targeting", "Target selection.");
+    private final PageOption targeting = new PageOption(this, "Targeting", "Target selection.");
     private final ModeOption<TargetMode> targetMode = new ModeOption<>(this, "Mode", "Algorithm for selecting targets.", TargetMode.Closest, targeting);
     private final SliderOption targetRange = new SliderOption(this, "TargetRange", "Range within which to select targets.", 8.0, 1.0, 16.0, 0.5, targeting);
     private final SliderOption anchorRange = new SliderOption(this, "AnchorRange", "Max distance from a target to place/use anchors.", 4.0, 1.0, 8.0, 0.5, targeting);
@@ -84,21 +84,21 @@ public class AnchorAuraModule extends AddonModule {
     private final ToggleOption targetInvisible = new ToggleOption(this, "Invisible", "Target invisible entities.", true, targeting);
 
     // Place
-    private final ParentOption place = new ParentOption(this, "Place", "Anchor placement.");
+    private final PageOption place = new PageOption(this, "Place", "Anchor placement.");
     private final SliderOption placeRange = new SliderOption(this, "Range", "Reach for placing anchors.", 4.5, 1.0, 6.0, 0.1, place);
     private final SliderOption placeWallsRange = new SliderOption(this, "WallsRange", "Reach for placing through walls (NCP only).", 4.0, 0.0, 6.0, 0.1, place);
     private final SliderOption placeDelay = new SliderOption(this, "PlaceDelay", "Ticks between placements (0 = every tick).", 0.0, 0.0, 10.0, 1.0, place);
     private final ToggleOption airPlace = new ToggleOption(this, "AirPlace", "Allow placing against air.", false, place);
 
     // Explode
-    private final ParentOption explode = new ParentOption(this, "Explode", "Anchor charge/detonation.");
+    private final PageOption explode = new PageOption(this, "Explode", "Anchor charge/detonation.");
     private final SliderOption explodeRange = new SliderOption(this, "Range", "Reach for charging/detonating visible anchors.", 4.5, 1.0, 6.0, 0.1, explode);
     private final SliderOption explodeWallsRange = new SliderOption(this, "WallsRange", "Reach for through-wall charging/detonating (NCP only).", 4.0, 0.0, 6.0, 0.1, explode);
     private final SliderOption chargeDelay = new SliderOption(this, "ChargeDelay", "Ticks to wait after placing before charging (0 = same tick).", 0.0, 0.0, 10.0, 1.0, explode);
     private final SliderOption explodeDelay = new SliderOption(this, "ExplodeDelay", "Ticks to wait after charging before detonating (0 = same tick).", 0.0, 0.0, 10.0, 1.0, explode);
 
     // Damage / Safety
-    private final ParentOption damage = new ParentOption(this, "Damage", "Damage thresholds and self safety.");
+    private final PageOption damage = new PageOption(this, "Damage", "Damage thresholds and self safety.");
     private final SliderOption minDamage = new SliderOption(this, "MinDamage", "Minimum damage to place/charge/detonate an anchor.", 6.0, 0.0, 36.0, 0.5, damage);
     private final SliderOption lethalHP = new SliderOption(this, "LethalHP", "Ignore min damage when target health (+absorption) is at/below this (face-place).", 0.0, 0.0, 36.0, 0.5, damage);
     private final SliderOption maxSelfDamage = new SliderOption(this, "MaxSelfDamage", "Maximum self damage allowed.", 8.0, 0.0, 36.0, 0.5, damage);
@@ -111,7 +111,7 @@ public class AnchorAuraModule extends AddonModule {
     private final SliderOption overrideMinDmg = new SliderOption(this, "OverrideMinDmg", "MinDamage used while Override is held.", 1.0, 0.0, 36.0, 0.5, damage);
 
     // List
-    private final ParentOption list = new ParentOption(this, "List", "ArrayList HUD info.");
+    private final PageOption list = new PageOption(this, "List", "ArrayList HUD info.");
     private final ToggleOption showTarget = new ToggleOption(this, "Target", "Show target name in ArrayList.", true, list);
     private final ToggleOption showDamage = new ToggleOption(this, "Damage", "Show target damage in ArrayList.", true, list);
     private final ToggleOption showCPS = new ToggleOption(this, "CPS", "Show detonations-per-second in ArrayList.", false, list);
@@ -189,10 +189,7 @@ public class AnchorAuraModule extends AddonModule {
         // abandon the current anchor if its target is gone
         if (workSpot != null && !workValid()) resetWork();
 
-        if (workSpot == null) {
-            if (tick - lastPlaceTick < placeDelay.getValue()) return;
-            if (!pickSpot()) return;
-        }
+        if (workSpot == null && !pickSpot()) return;
 
         final BlockPos spot = workSpot;
         final LivingEntity target = workTarget;
@@ -211,6 +208,7 @@ public class AnchorAuraModule extends AddonModule {
                 workPlaced = true;
                 workPlacedTick = tick - (long) Math.ceil(chargeDelay.getValue());
             } else {
+                if (tick - lastPlaceTick < placeDelay.getValue()) { flush(event, steps, spot); return; } // throttle placements
                 if (!anchorAvailable()) { resetWork(); return; }
                 BlockHitResult ph = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
                         placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
