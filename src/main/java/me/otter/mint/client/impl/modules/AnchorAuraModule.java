@@ -95,6 +95,7 @@ public class AnchorAuraModule extends AddonModule {
     private final ToggleOption airPlace = new ToggleOption(this, "AirPlace", "Allow placing against air.", false, place);
     private final ToggleOption instant = new ToggleOption(this, "Instant", "Re-place the anchor the same tick it detonates.", true, place);
     private final ToggleOption validate = new ToggleOption(this, "Validate", "Verify live block state before each place/charge/detonate", true, place);
+    private final SliderOption stickBonus = new SliderOption(this, "StickBonus", "Extra damage a new spot must beat to abandon the current/last spot (0 = always switch to the strictly best spot).", 6.0, 0.0, 36.0, 0.5, place);
 
     // Explode
     private final PageOption explode = new PageOption(this, "Explode", "Anchor charge/detonation.");
@@ -122,7 +123,8 @@ public class AnchorAuraModule extends AddonModule {
     private final ToggleOption showDamage = new ToggleOption(this, "Damage", "Show target damage in ArrayList.", true, list);
     private final ToggleOption showCPS = new ToggleOption(this, "CPS", "Show detonations-per-second in ArrayList.", false, list);
 
-    private static final double STICKY_BONUS = 1000.0;
+    private static final double EXISTING_ANCHOR_BONUS = 1000.0;
+    private static final double CHARGED_ANCHOR_BONUS = 2000.0;
 
     private final List<LivingEntity> targets = new ArrayList<>();
     private final Deque<Long> detonations = new ArrayDeque<>();
@@ -263,9 +265,10 @@ public class AnchorAuraModule extends AddonModule {
             if (tick - workChargedTick < explodeDelay.getValue()) { flush(event, steps, spot); return; }
             workSeenTick = tick;
             final int slot = findDetonateSlot();
+            final boolean[] detonatedNow = {false};
             steps.add(() -> {
                 if (!canDetonateNow(spot, chargedNow[0])) return;
-                if (useOnBlock(slot, face, DETONATE_HELD)) onDetonated(spot, target);
+                if (useOnBlock(slot, face, DETONATE_HELD)) { detonatedNow[0] = true; onDetonated(spot, target); }
             });
 
             boolean replace = instant.getValue()
@@ -276,7 +279,7 @@ public class AnchorAuraModule extends AddonModule {
                     && instantReplaceSafe(spot, target);
             if (replace) {
                 final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
-                steps.add(() -> placeAnchorAt(aSlot, spot, true));
+                steps.add(() -> { if (detonatedNow[0]) placeAnchorAt(aSlot, spot, true); });
                 workPlaced = true;
                 workCharged = false;
                 workPlacedTick = tick;
@@ -357,7 +360,9 @@ public class AnchorAuraModule extends AddonModule {
                             if (placeHit == null) continue;
                         }
 
-                        double score = dmg + (pos.equals(lastSpot) ? STICKY_BONUS : 0);
+                        double score = dmg;
+                        if (anchor) score += charges >= 1 ? CHARGED_ANCHOR_BONUS : EXISTING_ANCHOR_BONUS;
+                        if (pos.equals(lastSpot)) score += stickBonus.getValue();
                         if (score <= bestScore) continue;
                         bestScore = score; bestPos = pos; bestTgt = target;
                         bestPlaceHit = placeHit; bestCharges = charges;
@@ -435,7 +440,7 @@ public class AnchorAuraModule extends AddonModule {
         ToggleableSwapType mode = swapMode.getValue();
 
         if (mode == ToggleableSwapType.Off) {
-            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false; // wait for manual selection
+            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false;
             action.run();
             return true;
         }
