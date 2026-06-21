@@ -33,6 +33,7 @@ import net.minecraft.item.Items;
 import net.minecraft.client.network.PendingUpdateManager;
 import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
+import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.util.Hand;
 import net.minecraft.util.PlayerInput;
 import net.minecraft.util.hit.BlockHitResult;
@@ -323,8 +324,9 @@ public class AnchorAuraModule extends AddonModule {
         LivingEntity bestTgt = null;
         BlockHitResult bestPlaceHit = null;
         int bestCharges = -1;
-        double bestScore = -1;
-        double curScore = -1;
+        double bestPick = -1;     // best candidate incl. existing-anchor priority (used only when (re)selecting)
+        double curDmg = -1;       // raw damage of the spot we're already working, if it's still a valid candidate
+        double bestOtherDmg = -1; // best raw damage among spots other than the one we're working
 
         for (LivingEntity target : targets) {
             BlockPos center = target.getBlockPos();
@@ -360,18 +362,19 @@ public class AnchorAuraModule extends AddonModule {
                             if (placeHit == null) continue;
                         }
 
-                        double score = dmg;
-                        if (anchor) score += charges >= 1 ? CHARGED_ANCHOR_BONUS : EXISTING_ANCHOR_BONUS;
-                        if (pos.equals(workSpot)) curScore = score;
-                        if (score <= bestScore) continue;
-                        bestScore = score; bestPos = pos; bestTgt = target;
+                        double pick = dmg;
+                        if (anchor) pick += charges >= 1 ? CHARGED_ANCHOR_BONUS : EXISTING_ANCHOR_BONUS;
+                        if (workSpot != null && pos.equals(workSpot)) curDmg = dmg;
+                        else if (dmg > bestOtherDmg) bestOtherDmg = dmg;
+                        if (pick <= bestPick) continue;
+                        bestPick = pick; bestPos = pos; bestTgt = target;
                         bestPlaceHit = placeHit; bestCharges = charges;
                     }
                 }
             }
         }
 
-        if (curScore >= 0 && bestPos != null && !bestPos.equals(workSpot) && bestScore <= curScore + stickBonus.getValue()) {
+        if (curDmg >= 0 && bestOtherDmg <= curDmg + stickBonus.getValue()) {
             lastSpot = workSpot;
             return true;
         }
@@ -463,7 +466,13 @@ public class AnchorAuraModule extends AddonModule {
 
         // Silent / Alt
         boolean swapped = InvHelper.swapToSlot(slot, mode);
-        if (!swapped && !heldOk.test(Mint.mc.player.getMainHandStack())) return false;
+        if (!swapped) {
+            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false;
+            if (Mint.mc.getNetworkHandler() != null) {
+                Mint.mc.getNetworkHandler().sendPacket(
+                        new UpdateSelectedSlotC2SPacket(Mint.mc.player.getInventory().getSelectedSlot()));
+            }
+        }
         try {
             action.run();
         } finally {
