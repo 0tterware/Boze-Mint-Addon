@@ -128,10 +128,12 @@ public class AnchorAuraModule extends AddonModule {
 
     private BlockPos workSpot = null;
     private LivingEntity workTarget = null;
+    private BlockHitResult workPlaceHit = null;
     private boolean workPlaced = false;
     private boolean workCharged = false;
     private long workPlacedTick = 0;
     private long workChargedTick = 0;
+    private long workSeenTick = 0;
 
     private LivingEntity displayTarget = null;
     private double displayDamage = 0;
@@ -163,6 +165,7 @@ public class AnchorAuraModule extends AddonModule {
     private void resetWork() {
         workSpot = null;
         workTarget = null;
+        workPlaceHit = null;
         workPlaced = false;
         workCharged = false;
     }
@@ -200,6 +203,10 @@ public class AnchorAuraModule extends AddonModule {
         final BlockState state = WorldHelper.getBlockState(spot);
         final boolean isAnchor = state.isOf(Blocks.RESPAWN_ANCHOR);
 
+        // Stuck-detection
+        if (isAnchor) workSeenTick = tick;
+        else if (workPlaced && tick - workSeenTick > 20) { resetWork(); return; }
+
         final List<Runnable> steps = new ArrayList<>();
 
         // 1) place
@@ -215,6 +222,7 @@ public class AnchorAuraModule extends AddonModule {
                 if (ph == null) { resetWork(); return; } // new spot
                 final int slot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
                 final BlockHitResult fph = ph;
+                workPlaceHit = ph;
                 steps.add(() -> { placeAnchor(slot, fph); placements.render(fph); });
                 workPlaced = true;
                 workPlacedTick = tick;
@@ -242,9 +250,24 @@ public class AnchorAuraModule extends AddonModule {
             if (tick - workChargedTick < explodeDelay.getValue()) { flush(event, steps, spot); return; }
             final int slot = findDetonateSlot();
             steps.add(() -> { useOnBlock(slot, face); onDetonated(spot, target); });
-            // Keep the SAME spot
-            workPlaced = false;
-            workCharged = false;
+
+            if (workPlaceHit != null && anchorAvailable() && tick - lastPlaceTick >= placeDelay.getValue()) {
+                final BlockHitResult rph = workPlaceHit;
+                final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
+                final BlockPos rpSpot = spot;
+                steps.add(() -> {
+                    Mint.mc.world.setBlockState(rpSpot, Blocks.AIR.getDefaultState());
+                    placeAnchor(aSlot, rph);
+                    placements.render(rph);
+                });
+                workPlaced = true;
+                workCharged = false;
+                workPlacedTick = tick;
+                lastPlaceTick = tick;
+            } else {
+                workPlaced = false;
+                workCharged = false;
+            }
         }
 
         flush(event, steps, spot);
@@ -334,8 +357,10 @@ public class AnchorAuraModule extends AddonModule {
         workSpot = bestPos;
         workTarget = bestTgt;
         lastSpot = bestPos;
+        workPlaceHit = null;
         workPlaced = false;
         workCharged = false;
+        workSeenTick = tick;
         return true;
     }
 
