@@ -387,7 +387,7 @@ public class AnchorAuraModule extends AddonModule {
     }
 
     private void instantReplace(int slot, BlockPos spot) {
-        Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
+        if(fakeAir.getValue()) Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
         BlockHitResult hit = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
                 placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
         if (hit == null) return;
