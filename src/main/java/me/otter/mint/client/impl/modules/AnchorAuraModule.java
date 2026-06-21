@@ -73,7 +73,7 @@ public class AnchorAuraModule extends AddonModule {
     private final PageOption targeting = new PageOption(this, "Targeting", "Target selection.");
     private final ModeOption<TargetMode> targetMode = new ModeOption<>(this, "Mode", "Algorithm for selecting targets.", TargetMode.Closest, targeting);
     private final SliderOption targetRange = new SliderOption(this, "TargetRange", "Range within which to select targets.", 8.0, 1.0, 16.0, 0.5, targeting);
-    private final SliderOption anchorRange = new SliderOption(this, "AnchorRange", "Max distance from a target to place/use anchors.", 4.0, 1.0, 8.0, 0.5, targeting);
+    private final SliderOption anchorRange = new SliderOption(this, "AnchorRange", "Max distance from a target to place anchors.", 4.0, 1.0, 8.0, 0.5, targeting);
     private final SliderOption maxTargets = new SliderOption(this, "MaxTargets", "Max targets to consider.", 3.0, 1.0, 8.0, 1.0, targeting);
     private final ToggleOption targetPlayers = new ToggleOption(this, "Players", "Target players.", true, targeting);
     private final ToggleOption targetSelf = new ToggleOption(this, "Self", "Target yourself.", false, targeting);
@@ -88,13 +88,14 @@ public class AnchorAuraModule extends AddonModule {
     private final PageOption place = new PageOption(this, "Place", "Anchor placement.");
     private final SliderOption placeRange = new SliderOption(this, "Range", "Reach for placing anchors.", 4.5, 1.0, 6.0, 0.1, place);
     private final SliderOption placeWallsRange = new SliderOption(this, "WallsRange", "Reach for placing through walls (NCP only).", 4.0, 0.0, 6.0, 0.1, place);
-    private final SliderOption placeDelay = new SliderOption(this, "PlaceDelay", "Ticks between placements (0 = every tick).", 0.0, 0.0, 10.0, 1.0, place);
+    private final SliderOption placeDelay = new SliderOption(this, "PlaceDelay", "Ticks between placements.", 0.0, 0.0, 10.0, 1.0, place);
     private final ToggleOption airPlace = new ToggleOption(this, "AirPlace", "Allow placing against air.", false, place);
+    private final ToggleOption instant = new ToggleOption(this, "Instant", "Re-place the anchor the same tick it detonates.", true, place);
 
     // Explode
     private final PageOption explode = new PageOption(this, "Explode", "Anchor charge/detonation.");
-    private final SliderOption explodeRange = new SliderOption(this, "Range", "Reach for charging/detonating visible anchors.", 4.5, 1.0, 6.0, 0.1, explode);
-    private final SliderOption explodeWallsRange = new SliderOption(this, "WallsRange", "Reach for through-wall charging/detonating (NCP only).", 4.0, 0.0, 6.0, 0.1, explode);
+    private final SliderOption explodeRange = new SliderOption(this, "Range", "Reach for charging visible anchors.", 4.5, 1.0, 6.0, 0.1, explode);
+    private final SliderOption explodeWallsRange = new SliderOption(this, "WallsRange", "Reach for through-wall charging (NCP only).", 4.0, 0.0, 6.0, 0.1, explode);
     private final SliderOption chargeDelay = new SliderOption(this, "ChargeDelay", "Ticks to wait after placing before charging (0 = same tick).", 0.0, 0.0, 10.0, 1.0, explode);
     private final SliderOption explodeDelay = new SliderOption(this, "ExplodeDelay", "Ticks to wait after charging before detonating (0 = same tick).", 0.0, 0.0, 10.0, 1.0, explode);
 
@@ -252,7 +253,7 @@ public class AnchorAuraModule extends AddonModule {
             final int slot = findDetonateSlot();
             steps.add(() -> { useOnBlock(slot, face); onDetonated(spot, target); });
 
-            if (workPlaceHit != null && anchorAvailable() && tick - lastPlaceTick >= placeDelay.getValue()) {
+            if (instant.getValue() && workPlaceHit != null && anchorAvailable() && tick - lastPlaceTick >= placeDelay.getValue()) {
                 final BlockHitResult rph = workPlaceHit;
                 final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
                 final BlockPos rpSpot = spot;
