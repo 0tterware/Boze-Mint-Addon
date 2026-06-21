@@ -94,6 +94,7 @@ public class AnchorAuraModule extends AddonModule {
     private final SliderOption placeDelay = new SliderOption(this, "PlaceDelay", "Ticks between placements.", 0.0, 0.0, 10.0, 1.0, place);
     private final ToggleOption airPlace = new ToggleOption(this, "AirPlace", "Allow placing against air.", false, place);
     private final ToggleOption instant = new ToggleOption(this, "Instant", "Re-place the anchor the same tick it detonates.", true, place);
+    private final ToggleOption validate = new ToggleOption(this, "Validate", "Verify live block state before each place/charge/detonate", true, place);
 
     // Explode
     private final PageOption explode = new PageOption(this, "Explode", "Anchor charge/detonation.");
@@ -213,6 +214,8 @@ public class AnchorAuraModule extends AddonModule {
         else if (workPlaced && tick - workSeenTick > 20) { resetWork(); return; }
 
         final List<Runnable> steps = new ArrayList<>();
+        final boolean[] placedNow = {false};
+        final boolean[] chargedNow = {false};
         boolean placedThisTick = false;
 
         // 1) place
@@ -227,8 +230,7 @@ public class AnchorAuraModule extends AddonModule {
                         placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
                 if (ph == null) { resetWork(); return; } // new spot
                 final int slot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
-                final BlockHitResult fph = ph;
-                steps.add(() -> { placeAnchor(slot, fph); placements.render(fph); });
+                steps.add(() -> placedNow[0] = placeAnchorAt(slot, spot, false));
                 workOwns = true;
                 placedThisTick = true;
                 workPlaced = true;
@@ -243,10 +245,14 @@ public class AnchorAuraModule extends AddonModule {
                 workCharged = true;
                 workChargedTick = tick - (long) Math.ceil(explodeDelay.getValue());   // ready to detonate now
             } else {
+                if (validate.getValue() && !isAnchor && !placedThisTick) { resetWork(); return; }
                 if (tick - workPlacedTick < chargeDelay.getValue()) { flush(event, steps, spot); return; }
                 if (!glowstoneAvailable()) { flush(event, steps, spot); resetWork(); return; }
                 final int slot = findSlot(Items.GLOWSTONE);
-                steps.add(() -> useOnBlock(slot, face, s -> s.isOf(Items.GLOWSTONE)));
+                steps.add(() -> {
+                    if (!canChargeNow(spot, placedNow[0])) return;
+                    if (useOnBlock(slot, face, s -> s.isOf(Items.GLOWSTONE))) chargedNow[0] = true;
+                });
                 workCharged = true;
                 workChargedTick = tick;
             }
@@ -257,7 +263,10 @@ public class AnchorAuraModule extends AddonModule {
             if (tick - workChargedTick < explodeDelay.getValue()) { flush(event, steps, spot); return; }
             workSeenTick = tick;
             final int slot = findDetonateSlot();
-            steps.add(() -> { if (useOnBlock(slot, face, DETONATE_HELD)) onDetonated(spot, target); });
+            steps.add(() -> {
+                if (!canDetonateNow(spot, chargedNow[0])) return;
+                if (useOnBlock(slot, face, DETONATE_HELD)) onDetonated(spot, target);
+            });
 
             boolean replace = instant.getValue()
                     && workOwns
@@ -267,8 +276,7 @@ public class AnchorAuraModule extends AddonModule {
                     && instantReplaceSafe(spot, target);
             if (replace) {
                 final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
-                final BlockPos rpSpot = spot;
-                steps.add(() -> instantReplace(aSlot, rpSpot));
+                steps.add(() -> placeAnchorAt(aSlot, spot, true));
                 workPlaced = true;
                 workCharged = false;
                 workPlacedTick = tick;
@@ -379,19 +387,35 @@ public class AnchorAuraModule extends AddonModule {
         detonations.add(System.currentTimeMillis());
     }
 
-    private void placeAnchor(int slot, BlockHitResult hit) {
-        performStep(slot, s -> s.isOf(Blocks.RESPAWN_ANCHOR.asItem()),
+    private boolean placeAnchor(int slot, BlockHitResult hit) {
+        return performStep(slot, s -> s.isOf(Blocks.RESPAWN_ANCHOR.asItem()),
                 () -> PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND));
     }
 
-    private void instantReplace(int slot, BlockPos spot) {
-        if(fakeAir.getValue()) Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
+    private boolean placeAnchorAt(int slot, BlockPos spot, boolean fake) {
+        if (fake && fakeAir.getValue()) Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
+        if (validate.getValue() && !WorldHelper.isReplaceable(spot)) return false;
         BlockHitResult hit = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
                 placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
-        if (hit == null) return;
-        if (!PlaceRenderer.getRenderPos(hit).equals(spot)) return;
-        placeAnchor(slot, hit);
-        placements.render(hit);
+        if (hit == null) return false;
+        if (validate.getValue() && !PlaceRenderer.getRenderPos(hit).equals(spot)) return false;
+        boolean ok = placeAnchor(slot, hit);
+        if (ok) placements.render(hit);
+        return ok;
+    }
+
+    private boolean canChargeNow(BlockPos spot, boolean placedThisSeq) {
+        if (!validate.getValue()) return true;
+        if (placedThisSeq) return true;
+        BlockState s = WorldHelper.getBlockState(spot);
+        return s.isOf(Blocks.RESPAWN_ANCHOR) && s.get(RespawnAnchorBlock.CHARGES) < 1;
+    }
+
+    private boolean canDetonateNow(BlockPos spot, boolean chargedThisSeq) {
+        if (!validate.getValue()) return true;
+        if (chargedThisSeq) return true;
+        BlockState s = WorldHelper.getBlockState(spot);
+        return s.isOf(Blocks.RESPAWN_ANCHOR) && s.get(RespawnAnchorBlock.CHARGES) >= 1;
     }
 
     private boolean instantReplaceSafe(BlockPos spot, LivingEntity target) {
