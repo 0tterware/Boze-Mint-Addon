@@ -197,10 +197,9 @@ public class AnchorAuraModule extends AddonModule {
     private void cycle(EventInteract event) {
         if (!detonateAvailable()) return;
 
-        // abandon the current anchor if its target is gone
         if (workSpot != null && !workValid()) resetWork();
 
-        if (workSpot == null && !pickSpot()) return;
+        if (!pickSpot()) { resetWork(); return; }
 
         final BlockPos spot = workSpot;
         final LivingEntity target = workTarget;
@@ -376,13 +375,16 @@ public class AnchorAuraModule extends AddonModule {
         if (bestCharges < 1 && !glowstoneAvailable()) return false;
         if (computeAnchorFace(bestPos) == null) return false;
 
-        workSpot = bestPos;
+        if (!bestPos.equals(workSpot)) {
+            workSpot = bestPos;
+            workOwns = false;
+            workPlaced = false;
+            workCharged = false;
+            workSeenTick = tick;
+        }
+
         workTarget = bestTgt;
         lastSpot = bestPos;
-        workOwns = false;
-        workPlaced = false;
-        workCharged = false;
-        workSeenTick = tick;
         return true;
     }
 
