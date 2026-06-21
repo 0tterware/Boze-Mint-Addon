@@ -3,10 +3,8 @@ package me.otter.mint.client.impl.modules;
 import dev.boze.api.addon.AddonModule;
 import dev.boze.api.event.EventBind;
 import dev.boze.api.event.EventInteract;
-import dev.boze.api.event.EventWorldRender;
 import dev.boze.api.option.*;
 import dev.boze.api.render.PlaceRenderer;
-import dev.boze.api.render.WorldDrawer;
 import dev.boze.api.utility.EntityHelper;
 import dev.boze.api.utility.MathHelper;
 import dev.boze.api.utility.WorldHelper;
@@ -24,8 +22,6 @@ import net.minecraft.block.Blocks;
 import net.minecraft.block.RespawnAnchorBlock;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
@@ -57,21 +53,19 @@ public class AnchorAuraModule extends AddonModule {
 
     // General
     private final ModeOption<InteractionMode> antiCheat = new ModeOption<>(this, "AntiCheat", "Interaction mode.", InteractionMode.NCP);
+    private final SliderOption range = new SliderOption(this, "Range", "Reach for placing/charging anchors.", 4.5, 1.0, 6.0, 0.1);
+    private final SliderOption wallsRange = new SliderOption(this, "WallsRange", "Reach through walls (NCP only).", 4.0, 0.0, 6.0, 0.1);
     private final ModeOption<ToggleableSwapType> swapMode = new ModeOption<>(this, "SwapMode", "How to swap items into hand.", ToggleableSwapType.Silent);
     private final ToggleOption multiTask = new ToggleOption(this, "MultiTask", "Run while using items.", false);
     private final ToggleOption pauseOnUse = new ToggleOption(this, "PauseOnUse", "Pause while using an item", true);
-
-    // Render
-    private final ToggleOption render = new ToggleOption(this, "Render", "Render settings.", true);
-    private final ToggleOption fakeAir = new ToggleOption(this, "FakeAir", "Prevent ghost block rendering by setting block to air clientside", true, render);
-    private final RenderSettings placements = new RenderSettings(this, "Placements", render);
-    private final ToggleOption targetRender = new ToggleOption(this, "TargetRender", "Render a box around the current target.", true, render);
-    private final ColorOption targetColor = new ColorOption(this, "TargetColor", "Target box color.", Mint.CLIENT_COLOR, Mint.MAIN_FILL_OPACITY, Mint.MAIN_OUTLINE_OPACITY, targetRender::getValue, targetRender);
+    private final ToggleOption fakeAir = new ToggleOption(this, "FakeAir", "Prevent ghost block rendering by setting block to air clientside", true);
 
     // Rotate
     private final ToggleOption rotate = new ToggleOption(this, "Rotate", "Rotate to the anchor before placing/interacting.", true);
     private final ToggleOption strictDirection = new ToggleOption(this, "StrictDirection", "Pass strict direction checks for placements.", true, rotate::getValue, rotate);
     private final ModeOption<AimPoint> aimPoint = new ModeOption<>(this, "AimPoint", "Where on the anchor to aim.", AimPoint.Center, rotate::getValue, rotate);
+
+    private final RenderSettings render = new RenderSettings(this, "Render");
 
     // Targeting
     private final PageOption targeting = new PageOption(this, "Targeting", "Target selection.");
@@ -79,31 +73,16 @@ public class AnchorAuraModule extends AddonModule {
     private final SliderOption targetRange = new SliderOption(this, "TargetRange", "Range within which to select targets.", 8.0, 1.0, 16.0, 0.5, targeting);
     private final SliderOption anchorRange = new SliderOption(this, "AnchorRange", "Max distance from a target to place anchors.", 4.0, 1.0, 8.0, 0.5, targeting);
     private final SliderOption maxTargets = new SliderOption(this, "MaxTargets", "Max targets to consider.", 3.0, 1.0, 8.0, 1.0, targeting);
-    private final ToggleOption targetPlayers = new ToggleOption(this, "Players", "Target players.", true, targeting);
-    private final ToggleOption targetSelf = new ToggleOption(this, "Self", "Target yourself.", false, targeting);
-    private final ToggleOption targetFriends = new ToggleOption(this, "Friends", "Target friends.", false, targeting);
-    private final ToggleOption targetVillagers = new ToggleOption(this, "Villagers", "Target villagers.", false, targeting);
-    private final ToggleOption targetAnimals = new ToggleOption(this, "Animals", "Target animals.", false, targeting);
-    private final ToggleOption targetMonsters = new ToggleOption(this, "Monsters", "Target monsters.", false, targeting);
-    private final ToggleOption targetNeutrals = new ToggleOption(this, "Neutrals", "Target neutral mobs regardless of aggression state.", false, targeting);
-    private final ToggleOption targetInvisible = new ToggleOption(this, "Invisible", "Target invisible entities.", true, targeting);
 
     // Place
-    private final PageOption place = new PageOption(this, "Place", "Anchor placement.");
-    private final SliderOption placeRange = new SliderOption(this, "Range", "Reach for placing anchors.", 4.5, 1.0, 6.0, 0.1, place);
-    private final SliderOption placeWallsRange = new SliderOption(this, "WallsRange", "Reach for placing through walls (NCP only).", 4.0, 0.0, 6.0, 0.1, place);
-    private final SliderOption placeDelay = new SliderOption(this, "PlaceDelay", "Ticks between placements.", 0.0, 0.0, 10.0, 1.0, place);
-    private final ToggleOption airPlace = new ToggleOption(this, "AirPlace", "Allow placing against air.", false, place);
-    private final ToggleOption instant = new ToggleOption(this, "Instant", "Re-place the anchor the same tick it detonates.", true, place);
-    private final ToggleOption validate = new ToggleOption(this, "Validate", "Verify live block state before each place/charge/detonate", true, place);
-    private final SliderOption stickBonus = new SliderOption(this, "StickBonus", "Extra damage a new spot must beat to abandon the current/last spot (0 = always switch to the strictly best spot).", 6.0, 0.0, 36.0, 0.5, place);
-
-    // Explode
-    private final PageOption explode = new PageOption(this, "Explode", "Anchor charge/detonation.");
-    private final SliderOption explodeRange = new SliderOption(this, "Range", "Reach for charging visible anchors.", 4.5, 1.0, 6.0, 0.1, explode);
-    private final SliderOption explodeWallsRange = new SliderOption(this, "WallsRange", "Reach for through-wall charging (NCP only).", 4.0, 0.0, 6.0, 0.1, explode);
-    private final SliderOption chargeDelay = new SliderOption(this, "ChargeDelay", "Ticks to wait after placing before charging (0 = same tick).", 0.0, 0.0, 10.0, 1.0, explode);
-    private final SliderOption explodeDelay = new SliderOption(this, "ExplodeDelay", "Ticks to wait after charging before detonating (0 = same tick).", 0.0, 0.0, 10.0, 1.0, explode);
+    private final PageOption behavior = new PageOption(this, "Behavior", "How to anchor");
+    private final SliderOption placeDelay = new SliderOption(this, "PlaceDelay", "Ticks between placements.", 0.0, 0.0, 10.0, 1.0, behavior);
+    private final SliderOption chargeDelay = new SliderOption(this, "ChargeDelay", "Ticks to wait after placing before charging (0 = same tick).", 0.0, 0.0, 10.0, 1.0, behavior);
+    private final SliderOption explodeDelay = new SliderOption(this, "ExplodeDelay", "Ticks to wait after charging before detonating (0 = same tick).", 0.0, 0.0, 10.0, 1.0, behavior);
+    private final ToggleOption airPlace = new ToggleOption(this, "AirPlace", "Allow placing against air.", false, behavior);
+    private final ToggleOption instant = new ToggleOption(this, "Instant", "Re-place the anchor the same tick it detonates.", true, behavior);
+    private final ToggleOption validate = new ToggleOption(this, "Validate", "Verify live block state before each place/charge/detonate", true, behavior);
+    private final SliderOption stickBonus = new SliderOption(this, "StickBonus", "Extra damage a new spot must beat to abandon the current/last spot (0 = always switch to the strictly best spot).", 6.0, 0.0, 36.0, 0.5, behavior);
 
     // Damage / Safety
     private final PageOption damage = new PageOption(this, "Damage", "Damage thresholds and self safety.");
@@ -132,7 +111,6 @@ public class AnchorAuraModule extends AddonModule {
 
     private long tick = 0;
     private long lastPlaceTick = -1000L;
-    private BlockPos lastSpot = null;
     private boolean overrideHeld = false;
 
     private BlockPos workSpot = null;
@@ -164,7 +142,6 @@ public class AnchorAuraModule extends AddonModule {
     private void resetState() {
         targets.clear();
         detonations.clear();
-        lastSpot = null;
         displayTarget = null;
         displayDamage = 0;
         lastPlaceTick = -1000L;
@@ -207,11 +184,10 @@ public class AnchorAuraModule extends AddonModule {
         displayTarget = target;
 
         final BlockHitResult face = computeAnchorFace(spot);
-        if (face == null) { resetWork(); return; }   // can't reach the spot anymore
+        if (face == null) { resetWork(); return; }
         final BlockState state = WorldHelper.getBlockState(spot);
         final boolean isAnchor = state.isOf(Blocks.RESPAWN_ANCHOR);
 
-        // Stuck-detection
         if (isAnchor) workSeenTick = tick;
         else if (workPlaced && tick - workSeenTick > 20) { resetWork(); return; }
 
@@ -229,7 +205,7 @@ public class AnchorAuraModule extends AddonModule {
                 if (tick - lastPlaceTick < placeDelay.getValue()) { flush(event, steps, spot); return; } // throttle placements
                 if (!anchorAvailable()) { resetWork(); return; }
                 BlockHitResult ph = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
-                        placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
+                        range.getValue(), wallsRange.getValue(), strictDirection.getValue());
                 if (ph == null) { resetWork(); return; } // new spot
                 final int slot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
                 steps.add(() -> placedNow[0] = placeAnchorAt(slot, spot, false));
@@ -312,21 +288,21 @@ public class AnchorAuraModule extends AddonModule {
 
     private boolean workValid() {
         if (workTarget == null || !EntityHelper.isAlive(workTarget) || EntityHelper.getHealth(workTarget) <= 0) return false;
-        return withinReach(workSpot, Math.max(explodeRange.getValue(), explodeWallsRange.getValue()));
+        return withinReach(workSpot, Math.max(range.getValue(), wallsRange.getValue()));
     }
 
     private boolean pickSpot() {
         final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
-        final double exReach = Math.max(explodeRange.getValue(), explodeWallsRange.getValue());
+        final double exReach = Math.max(range.getValue(), wallsRange.getValue());
         final int r = (int) Math.ceil(anchorRange.getValue());
 
         BlockPos bestPos = null;
         LivingEntity bestTgt = null;
         BlockHitResult bestPlaceHit = null;
         int bestCharges = -1;
-        double bestPick = -1;     // best candidate incl. existing-anchor priority (used only when (re)selecting)
-        double curDmg = -1;       // raw damage of the spot we're already working, if it's still a valid candidate
-        double bestOtherDmg = -1; // best raw damage among spots other than the one we're working
+        double bestPick = -1;
+        double curDmg = -1;
+        double bestOtherDmg = -1;
 
         for (LivingEntity target : targets) {
             BlockPos center = target.getBlockPos();
@@ -358,7 +334,7 @@ public class AnchorAuraModule extends AddonModule {
                             if (!WorldHelper.isValidPlacement(pos, Blocks.RESPAWN_ANCHOR)) continue;
                             if (!PlaceHelper.isEmpty(pos)) continue;
                             placeHit = PlaceHelper.cast(pos, airPlace.getValue(), antiCheat.getValue(),
-                                    placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
+                                    range.getValue(), wallsRange.getValue(), strictDirection.getValue());
                             if (placeHit == null) continue;
                         }
 
@@ -375,7 +351,6 @@ public class AnchorAuraModule extends AddonModule {
         }
 
         if (curDmg >= 0 && bestOtherDmg <= curDmg + stickBonus.getValue()) {
-            lastSpot = workSpot;
             return true;
         }
 
@@ -393,7 +368,6 @@ public class AnchorAuraModule extends AddonModule {
         }
 
         workTarget = bestTgt;
-        lastSpot = bestPos;
         return true;
     }
 
@@ -412,11 +386,11 @@ public class AnchorAuraModule extends AddonModule {
         if (fake && fakeAir.getValue()) Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
         if (validate.getValue() && !WorldHelper.isReplaceable(spot)) return false;
         BlockHitResult hit = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
-                placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
+                range.getValue(), wallsRange.getValue(), strictDirection.getValue());
         if (hit == null) return false;
         if (validate.getValue() && !PlaceRenderer.getRenderPos(hit).equals(spot)) return false;
         boolean ok = placeAnchor(slot, hit);
-        if (ok) placements.render(hit);
+        if (ok) render.render(hit);
         return ok;
     }
 
@@ -588,7 +562,7 @@ public class AnchorAuraModule extends AddonModule {
     private BlockHitResult computeAnchorFace(BlockPos pos) {
         Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
         boolean grim = antiCheat.getValue() == InteractionMode.Grim;
-        double range = Math.max(explodeRange.getValue(), explodeWallsRange.getValue());
+        double reach = Math.max(range.getValue(), wallsRange.getValue());
         Vec3d center = Vec3d.ofCenter(pos);
 
         BlockHitResult best = null;
@@ -602,7 +576,7 @@ public class AnchorAuraModule extends AddonModule {
             if (eye.subtract(face).dotProduct(normal) <= 0) continue; // back-face cull
 
             double dist = face.distanceTo(eye);
-            if (!grim && dist > range) continue;
+            if (!grim && dist > reach) continue;
 
             if (dist < fallbackDist) {
                 fallbackDist = dist;
@@ -632,11 +606,11 @@ public class AnchorAuraModule extends AddonModule {
 
         List<LivingEntity> found = new ArrayList<>();
         for (Entity entity : Mint.mc.world.getEntities()) {
-            if (!(entity instanceof LivingEntity le)) continue;
+            if (!(entity instanceof PlayerEntity le)) continue;
+            if (le == Mint.mc.player) continue;
+            if (EntityHelper.isFriend(le)) continue;
             if (!EntityHelper.isAlive(le)) continue;
             if (EntityHelper.getHealth(le) <= 0) continue;
-            if (!targetInvisible.getValue() && EntityHelper.isInvisible(le)) continue;
-            if (!isValidType(le)) continue;
             if (Vec3d.ofCenter(le.getBlockPos()).distanceTo(eye) > targetRange.getValue()
                     && le.distanceTo(Mint.mc.player) > targetRange.getValue()) continue;
             found.add(le);
@@ -662,33 +636,9 @@ public class AnchorAuraModule extends AddonModule {
         };
     }
 
-    private boolean isValidType(LivingEntity le) {
-        if (le == Mint.mc.player) return targetSelf.getValue();
-        if (le instanceof PlayerEntity p) {
-            if (EntityHelper.isFriend(p)) return targetFriends.getValue();
-            return targetPlayers.getValue();
-        }
-        if (le instanceof VillagerEntity) return targetVillagers.getValue();
-        if (EntityHelper.isHostile(le)) return targetMonsters.getValue();
-        if (le instanceof Angerable) return targetNeutrals.getValue();
-        if (EntityHelper.isPassive(le)) return targetAnimals.getValue();
-        return false;
-    }
-
     private void updateCps() {
         long now = System.currentTimeMillis();
         while (!detonations.isEmpty() && now - detonations.peekFirst() > 1000L) detonations.pollFirst();
-    }
-
-    @EventHandler
-    private void onWorldRender(EventWorldRender event) {
-        if (Mint.mc.player == null || Mint.mc.world == null) return;
-        if (!targetRender.getValue() || displayTarget == null) return;
-        if (!EntityHelper.isAlive(displayTarget)) return;
-
-        WorldDrawer.start();
-        WorldDrawer.dynamicBox(targetColor.getValue(), false, displayTarget.getBoundingBox(), 0.0f);
-        WorldDrawer.draw(event.matrices);
     }
 
     @Override

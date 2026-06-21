@@ -12,6 +12,8 @@ import me.otter.mint.Mint;
 import me.otter.mint.client.core.feature.RenderSettings;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Blocks;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
@@ -257,6 +259,22 @@ public class AutoTNTModule extends AddonModule {
 
             if (debug.getValue()) ChatHelper.sendMsg(this.getName(), "Placed TNT at " + winPos.toShortString());
         };
+    }
+
+    @Override
+    public String getArrayListInfo() {
+        if (Mint.mc.player == null) return "";
+        return String.valueOf(countTNT());
+    }
+
+    private int countTNT() {
+        int count = 0;
+        PlayerInventory inv = Mint.mc.player.getInventory();
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack stack = inv.getStack(i);
+            if (stack.isOf(Blocks.TNT.asItem())) count += stack.getCount();
+        }
+        return count;
     }
 
     @EventHandler
