@@ -5,6 +5,7 @@ import dev.boze.api.event.EventBind;
 import dev.boze.api.event.EventInteract;
 import dev.boze.api.event.EventWorldRender;
 import dev.boze.api.option.*;
+import dev.boze.api.render.PlaceRenderer;
 import dev.boze.api.render.WorldDrawer;
 import dev.boze.api.utility.EntityHelper;
 import dev.boze.api.utility.MathHelper;
@@ -130,7 +131,7 @@ public class AnchorAuraModule extends AddonModule {
 
     private BlockPos workSpot = null;
     private LivingEntity workTarget = null;
-    private BlockHitResult workPlaceHit = null;
+    private boolean workOwns = false;
     private boolean workPlaced = false;
     private boolean workCharged = false;
     private long workPlacedTick = 0;
@@ -167,7 +168,7 @@ public class AnchorAuraModule extends AddonModule {
     private void resetWork() {
         workSpot = null;
         workTarget = null;
-        workPlaceHit = null;
+        workOwns = false;
         workPlaced = false;
         workCharged = false;
     }
@@ -210,6 +211,7 @@ public class AnchorAuraModule extends AddonModule {
         else if (workPlaced && tick - workSeenTick > 20) { resetWork(); return; }
 
         final List<Runnable> steps = new ArrayList<>();
+        boolean placedThisTick = false;
 
         // 1) place
         if (!workPlaced) {
@@ -224,8 +226,9 @@ public class AnchorAuraModule extends AddonModule {
                 if (ph == null) { resetWork(); return; } // new spot
                 final int slot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
                 final BlockHitResult fph = ph;
-                workPlaceHit = ph;
                 steps.add(() -> { placeAnchor(slot, fph); placements.render(fph); });
+                workOwns = true;
+                placedThisTick = true;
                 workPlaced = true;
                 workPlacedTick = tick;
                 lastPlaceTick = tick;
@@ -250,18 +253,20 @@ public class AnchorAuraModule extends AddonModule {
         // 3) detonate
         if (workCharged) {
             if (tick - workChargedTick < explodeDelay.getValue()) { flush(event, steps, spot); return; }
+            workSeenTick = tick;
             final int slot = findDetonateSlot();
             steps.add(() -> { useOnBlock(slot, face); onDetonated(spot, target); });
 
-            if (instant.getValue() && workPlaceHit != null && anchorAvailable() && tick - lastPlaceTick >= placeDelay.getValue()) {
-                final BlockHitResult rph = workPlaceHit;
+            boolean replace = instant.getValue()
+                    && workOwns
+                    && !placedThisTick
+                    && anchorAvailable()
+                    && tick - lastPlaceTick >= placeDelay.getValue()
+                    && instantReplaceSafe(spot, target);
+            if (replace) {
                 final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
                 final BlockPos rpSpot = spot;
-                steps.add(() -> {
-                    if (fakeAir.getValue()) Mint.mc.world.setBlockState(rpSpot, Blocks.AIR.getDefaultState());
-                    placeAnchor(aSlot, rph);
-                    placements.render(rph);
-                });
+                steps.add(() -> instantReplace(aSlot, rpSpot));
                 workPlaced = true;
                 workCharged = false;
                 workPlacedTick = tick;
@@ -359,7 +364,7 @@ public class AnchorAuraModule extends AddonModule {
         workSpot = bestPos;
         workTarget = bestTgt;
         lastSpot = bestPos;
-        workPlaceHit = null;
+        workOwns = false;
         workPlaced = false;
         workCharged = false;
         workSeenTick = tick;
@@ -379,6 +384,23 @@ public class AnchorAuraModule extends AddonModule {
         }
         PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND);
         if (swapped) InvHelper.swapBack();
+    }
+
+    private void instantReplace(int slot, BlockPos spot) {
+        Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
+        BlockHitResult hit = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
+                placeRange.getValue(), placeWallsRange.getValue(), strictDirection.getValue());
+        if (hit == null) return;
+        if (!PlaceRenderer.getRenderPos(hit).equals(spot)) return;
+        placeAnchor(slot, hit);
+        placements.render(hit);
+    }
+
+    private boolean instantReplaceSafe(BlockPos spot, LivingEntity target) {
+        double self = selfDamage(spot);
+        if (!selfSafe(self)) return false;
+        double dmg = enemyDamage(target, spot);
+        return passesDamage(dmg, self, target, effMinDamage());
     }
 
     private void useOnBlock(int slot, BlockHitResult hit) {
