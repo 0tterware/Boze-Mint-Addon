@@ -30,7 +30,9 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.client.network.PendingUpdateManager;
 import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
 import net.minecraft.util.Hand;
 import net.minecraft.util.PlayerInput;
 import net.minecraft.util.hit.BlockHitResult;
@@ -244,7 +246,7 @@ public class AnchorAuraModule extends AddonModule {
                 if (tick - workPlacedTick < chargeDelay.getValue()) { flush(event, steps, spot); return; }
                 if (!glowstoneAvailable()) { flush(event, steps, spot); resetWork(); return; }
                 final int slot = findSlot(Items.GLOWSTONE);
-                steps.add(() -> useOnBlock(slot, face));
+                steps.add(() -> useOnBlock(slot, face, s -> s.isOf(Items.GLOWSTONE)));
                 workCharged = true;
                 workChargedTick = tick;
             }
@@ -255,7 +257,7 @@ public class AnchorAuraModule extends AddonModule {
             if (tick - workChargedTick < explodeDelay.getValue()) { flush(event, steps, spot); return; }
             workSeenTick = tick;
             final int slot = findDetonateSlot();
-            steps.add(() -> { useOnBlock(slot, face); onDetonated(spot, target); });
+            steps.add(() -> { if (useOnBlock(slot, face, DETONATE_HELD)) onDetonated(spot, target); });
 
             boolean replace = instant.getValue()
                     && workOwns
@@ -378,12 +380,8 @@ public class AnchorAuraModule extends AddonModule {
     }
 
     private void placeAnchor(int slot, BlockHitResult hit) {
-        boolean swapped = false;
-        if (swapMode.getValue() != ToggleableSwapType.Off && slot != -1) {
-            swapped = InvHelper.swapToSlot(slot, swapMode.getValue());
-        }
-        PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND);
-        if (swapped) InvHelper.swapBack();
+        performStep(slot, s -> s.isOf(Blocks.RESPAWN_ANCHOR.asItem()),
+                () -> PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND));
     }
 
     private void instantReplace(int slot, BlockPos spot) {
@@ -403,14 +401,55 @@ public class AnchorAuraModule extends AddonModule {
         return passesDamage(dmg, self, target, effMinDamage());
     }
 
-    private void useOnBlock(int slot, BlockHitResult hit) {
-        boolean swapped = false;
-        if (swapMode.getValue() != ToggleableSwapType.Off && slot >= 0) {
-            swapped = InvHelper.swapToSlot(slot, swapMode.getValue());
+    private static final Predicate<ItemStack> DETONATE_HELD = s -> s.isEmpty() || s.getItem() != Items.GLOWSTONE;
+
+    private boolean useOnBlock(int slot, BlockHitResult hit, Predicate<ItemStack> heldOk) {
+        return performStep(slot, heldOk, () -> interactBlockRaw(hit));
+    }
+
+    private boolean performStep(int slot, Predicate<ItemStack> heldOk, Runnable action) {
+        ToggleableSwapType mode = swapMode.getValue();
+
+        if (mode == ToggleableSwapType.Off) {
+            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false; // wait for manual selection
+            action.run();
+            return true;
         }
-        Mint.mc.interactionManager.interactBlock(Mint.mc.player, Hand.MAIN_HAND, hit);
+
+        if (slot < 0) return false;
+
+        if (mode == ToggleableSwapType.Normal) {
+            InvHelper.swapToSlot(slot, ToggleableSwapType.Normal);
+            action.run();
+            return true;
+        }
+
+        // Silent / Alt
+        boolean swapped = InvHelper.swapToSlot(slot, mode);
+        if (!swapped && !heldOk.test(Mint.mc.player.getMainHandStack())) return false;
+        try {
+            action.run();
+        } finally {
+            if (swapped) InvHelper.swapBack();
+        }
+        return true;
+    }
+
+    private void interactBlockRaw(BlockHitResult hit) {
+        try {
+            sendInteract(hit);
+        } catch (Throwable t) {
+            Mint.mc.interactionManager.interactBlock(Mint.mc.player, Hand.MAIN_HAND, hit);
+        }
         Mint.mc.player.swingHand(Hand.MAIN_HAND);
-        if (swapped) InvHelper.swapBack();
+    }
+
+    private void sendInteract(BlockHitResult hit) {
+        if (Mint.mc.getNetworkHandler() == null || Mint.mc.world == null) return;
+        try (PendingUpdateManager pum = Mint.mc.world.getPendingUpdateManager().incrementSequence()) {
+            Mint.mc.getNetworkHandler().sendPacket(
+                    new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, hit, pum.getSequence()));
+        }
     }
 
     private void sendSneak(boolean sneaking) {

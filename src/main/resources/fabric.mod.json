@@ -11,6 +11,7 @@
   "license": "All-Rights-Reserved",
   "icon": "assets/mint/icon.png",
   "environment": "*",
+  "accessWidener": "mint.accesswidener",
   "mixins": [
     "mint.mixins.json"
   ],
