@@ -59,6 +59,7 @@ public class AnchorAuraModule extends AddonModule {
 
     // Render
     private final ToggleOption render = new ToggleOption(this, "Render", "Render settings.", true);
+    private final ToggleOption fakeAir = new ToggleOption(this, "FakeAir", "Prevent ghost block rendering by setting block to air clientside", true, render);
     private final RenderSettings placements = new RenderSettings(this, "Placements", render);
     private final ToggleOption targetRender = new ToggleOption(this, "TargetRender", "Render a box around the current target.", true, render);
     private final ColorOption targetColor = new ColorOption(this, "TargetColor", "Target box color.", Mint.CLIENT_COLOR, Mint.MAIN_FILL_OPACITY, Mint.MAIN_OUTLINE_OPACITY, targetRender::getValue, targetRender);
@@ -256,7 +257,7 @@ public class AnchorAuraModule extends AddonModule {
                 final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
                 final BlockPos rpSpot = spot;
                 steps.add(() -> {
-                    Mint.mc.world.setBlockState(rpSpot, Blocks.AIR.getDefaultState());
+                    if (fakeAir.getValue()) Mint.mc.world.setBlockState(rpSpot, Blocks.AIR.getDefaultState());
                     placeAnchor(aSlot, rph);
                     placements.render(rph);
                 });
