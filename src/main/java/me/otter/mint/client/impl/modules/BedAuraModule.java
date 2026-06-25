@@ -3,7 +3,6 @@ package me.otter.mint.client.impl.modules;
 import dev.boze.api.addon.AddonModule;
 import dev.boze.api.event.EventBind;
 import dev.boze.api.event.EventInteract;
-import dev.boze.api.event.EventPlayerUpdate;
 import dev.boze.api.option.*;
 import dev.boze.api.utility.EntityHelper;
 import dev.boze.api.utility.MathHelper;
@@ -18,23 +17,17 @@ import me.otter.mint.client.core.utils.DamageUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.BedBlock;
 import net.minecraft.block.Blocks;
-import net.minecraft.block.CraftingTableBlock;
 import net.minecraft.client.network.PendingUpdateManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.BedItem;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.screen.CraftingScreenHandler;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.Hand;
 import net.minecraft.util.PlayerInput;
 import net.minecraft.util.hit.BlockHitResult;
@@ -56,7 +49,6 @@ public class BedAuraModule extends AddonModule {
 
     private enum TargetMode { Closest, Furthest, LowestHealth, LowestArmor }
     private enum AimPoint { Center, Nearest }
-    private enum PlacePriority { Closest, Down, Hole }
 
     // General
     private final ModeOption<InteractionMode> antiCheat = new ModeOption<>(this, "AntiCheat", "Interaction mode.", InteractionMode.NCP);
@@ -102,18 +94,6 @@ public class BedAuraModule extends AddonModule {
     private final BindOption override = new BindOption(this, "Override", "Hold to use OverrideMinDmg instead of MinDamage (more aggressive).", -1, false, damage);
     private final SliderOption overrideMinDmg = new SliderOption(this, "OverrideMinDmg", "MinDamage used while Override is held.", 1.0, 0.0, 36.0, 0.5, damage);
 
-    // AutoCraft
-    private final PageOption autoCraftPage = new PageOption(this, "AutoCraft", "Resupply beds from a crafting table.");
-    private final ToggleOption autoCraft = new ToggleOption(this, "AutoCraft", "Automatically craft beds when low.", false, autoCraftPage);
-    private final SliderOption minBeds = new SliderOption(this, "MinBeds", "Craft when bed count is at/below this.", 4.0, 0.0, 36.0, 1.0, autoCraft::getValue, autoCraftPage);
-    private final SliderOption bedsPerCraft = new SliderOption(this, "BedsPerCraft", "Max beds to craft per session.", 8.0, 1.0, 27.0, 1.0, autoCraft::getValue, autoCraftPage);
-    private final SliderOption minFreeSlots = new SliderOption(this, "MinFreeSlots", "Keep this many inventory slots free so returned wool/planks aren't dropped.", 6.0, 0.0, 27.0, 1.0, autoCraft::getValue, autoCraftPage);
-    private final ToggleOption autoPlaceTable = new ToggleOption(this, "AutoPlaceTable", "Place a crafting table if none is nearby.", true, autoCraft::getValue, autoCraftPage);
-    private final ModeOption<PlacePriority> tablePriority = new ModeOption<>(this, "TablePriority", "Where to place the crafting table. Closest: nearest viable spot. Down: prefer placing low. Hole: prefer holes.", PlacePriority.Closest, () -> autoCraft.getValue() && autoPlaceTable.getValue(), autoCraftPage);
-    private final SliderOption tableDownRange = new SliderOption(this, "TableDownRange", "How far below to favour table spots in Down mode.", 4.0, 0.0, 12.0, 0.5, () -> autoCraft.getValue() && autoPlaceTable.getValue() && tablePriority.getValue() == PlacePriority.Down, autoCraftPage);
-    private final SliderOption craftDelay = new SliderOption(this, "CraftDelay", "Ticks between craft actions.", 4.0, 0.0, 40.0, 1.0, autoCraft::getValue, autoCraftPage);
-    private final SliderOption tableRange = new SliderOption(this, "TableRange", "Range to search for / place a crafting table.", 4.0, 1.0, 6.0, 0.5, autoCraft::getValue, autoCraftPage);
-
     // List
     private final PageOption list = new PageOption(this, "List", "ArrayList HUD info.");
     private final ToggleOption showTarget = new ToggleOption(this, "Target", "Show target name in ArrayList.", true, list);
@@ -141,8 +121,6 @@ public class BedAuraModule extends AddonModule {
 
     private LivingEntity displayTarget = null;
     private double displayDamage = 0;
-
-    private long lastCraftMs = 0L;
 
     public BedAuraModule() {
         super("BedAura", "Automatically places and detonates beds to nuke enemies in the Nether/End.");
@@ -184,7 +162,6 @@ public class BedAuraModule extends AddonModule {
         if (Mint.mc.player == null || Mint.mc.world == null) return;
         if (event.getMode() != antiCheat.getValue()) return;
         if (Mint.mc.world.getRegistryKey() == World.OVERWORLD) return; // beds only explode in the Nether/End
-        if (Mint.mc.player.currentScreenHandler instanceof CraftingScreenHandler) return; // crafting; pause combat
         if (!multiTask.getValue() && pauseOnUse.getValue() && Mint.mc.player.isUsingItem()) return;
         if (EntityHelper.getHealth(Mint.mc.player) <= minHealth.getValue()) return;
 
@@ -772,230 +749,6 @@ public class BedAuraModule extends AddonModule {
             sb.append(detonations.size()).append(" cps");
         }
         return sb.toString();
-    }
-
-    @EventHandler
-    private void onPlayerUpdate(EventPlayerUpdate event) {
-        if (!autoCraft.getValue()) return;
-        if (Mint.mc.player == null || Mint.mc.world == null || Mint.mc.interactionManager == null) return;
-
-        long now = System.currentTimeMillis();
-        if (now - lastCraftMs < craftDelay.getValue() * 50L) return;
-
-        // already in a crafting table -> fill, craft, close
-        if (Mint.mc.player.currentScreenHandler instanceof CraftingScreenHandler csh) {
-            if (countBeds() <= minBeds.getValue()) craftBeds(csh);
-            Mint.mc.player.closeHandledScreen();
-            lastCraftMs = now;
-            return;
-        }
-
-        if (countBeds() > minBeds.getValue()) return;
-        if (!hasIngredients()) return; // don't open a table we can't craft from
-        if (freeInventorySlots() <= minFreeSlots.getValue()) return; // keep room for returned wool/planks
-
-        BlockPos table = findCraftingTable();
-        if (table == null) {
-            if (autoPlaceTable.getValue() && tablePlaceAvailable()) {
-                tryPlaceTable();
-                lastCraftMs = now;
-            }
-            return;
-        }
-
-        openTable(table);
-        lastCraftMs = now;
-    }
-
-    private int countBeds() {
-        int count = 0;
-        PlayerInventory inv = Mint.mc.player.getInventory();
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack stack = inv.getStack(i);
-            if (stack.getItem() instanceof BedItem) count += stack.getCount();
-        }
-        return count;
-    }
-
-    private int freeInventorySlots() {
-        int free = 0;
-        PlayerInventory inv = Mint.mc.player.getInventory();
-        for (int i = 0; i < inv.size(); i++) {
-            if (inv.getStack(i).isEmpty()) free++;
-        }
-        return free;
-    }
-
-    // need a single stack of >=3 same-colour wool and at least 3 planks to craft a bed
-    private boolean hasIngredients() {
-        PlayerInventory inv = Mint.mc.player.getInventory();
-        boolean wool = false;
-        int planks = 0;
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack s = inv.getStack(i);
-            if (s.isEmpty()) continue;
-            if (s.isIn(ItemTags.WOOL) && s.getCount() >= 3) wool = true;
-            if (s.isIn(ItemTags.PLANKS)) planks += s.getCount();
-        }
-        return wool && planks >= 3;
-    }
-
-    private BlockPos findCraftingTable() {
-        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
-        int r = (int) Math.ceil(tableRange.getValue());
-        BlockPos base = Mint.mc.player.getBlockPos();
-        BlockPos best = null;
-        double bestDist = Double.MAX_VALUE;
-        for (int ox = -r; ox <= r; ox++) {
-            for (int oy = -r; oy <= r; oy++) {
-                for (int oz = -r; oz <= r; oz++) {
-                    BlockPos pos = base.add(ox, oy, oz);
-                    if (!(WorldHelper.getBlockState(pos).getBlock() instanceof CraftingTableBlock)) continue;
-                    double d = Vec3d.ofCenter(pos).distanceTo(eye);
-                    if (d > tableRange.getValue() + 0.5) continue;
-                    if (d < bestDist) { bestDist = d; best = pos; }
-                }
-            }
-        }
-        return best;
-    }
-
-    private void openTable(BlockPos table) {
-        BlockHitResult face = computeBedFace(table);
-        if (face == null) return;
-        boolean wasSneaking = Mint.mc.player.isSneaking();
-        if (wasSneaking) sendSneak(false);
-        float[] rot = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), face.getPos());
-        Mint.mc.player.setYaw(rot[0]);
-        Mint.mc.player.setPitch(rot[1]);
-        Mint.mc.interactionManager.interactBlock(Mint.mc.player, Hand.MAIN_HAND, face);
-        Mint.mc.player.swingHand(Hand.MAIN_HAND);
-        if (wasSneaking) sendSneak(true);
-    }
-
-    private boolean tablePlaceAvailable() {
-        return InvHelper.findInHotbar(Blocks.CRAFTING_TABLE) != -1 || InvHelper.find(Blocks.CRAFTING_TABLE) != -1;
-    }
-
-    private void tryPlaceTable() {
-        BlockPos spot = pickTableSpot();
-        if (spot == null) return;
-
-        int slot = swapMode.getValue() == ToggleableSwapType.Alt
-                ? InvHelper.find(Blocks.CRAFTING_TABLE) : InvHelper.findInHotbar(Blocks.CRAFTING_TABLE);
-        if (slot == -1) return;
-
-        Vec3d hitVec = new Vec3d(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
-        BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, spot.down(), false);
-        performStep(slot, s -> s.getItem() == Blocks.CRAFTING_TABLE.asItem(),
-                () -> PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND));
-    }
-
-    // choose a viable crafting-table spot near the player according to TablePriority
-    private BlockPos pickTableSpot() {
-        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
-        final double reach = Math.max(range.getValue(), wallsRange.getValue());
-        final int r = (int) Math.ceil(tableRange.getValue());
-        final BlockPos base = Mint.mc.player.getBlockPos();
-
-        BlockPos best = null;
-        double bestScore = -Double.MAX_VALUE;
-
-        for (int ox = -r; ox <= r; ox++) {
-            for (int oy = -r; oy <= r; oy++) {
-                for (int oz = -r; oz <= r; oz++) {
-                    BlockPos pos = base.add(ox, oy, oz);
-                    double dist = Vec3d.ofCenter(pos).distanceTo(eye);
-                    if (dist > tableRange.getValue() + 0.5) continue;
-                    if (!withinReach(pos, reach)) continue;
-                    if (!WorldHelper.isReplaceable(pos)) continue;
-                    if (!WorldHelper.canPlaceAt(pos)) continue;
-                    if (!WorldHelper.isValidPlacement(pos, Blocks.CRAFTING_TABLE)) continue;
-                    if (!PlaceHelper.isEmpty(pos)) continue;
-                    if (WorldHelper.isReplaceable(pos.down())) continue; // need a floor
-
-                    double score;
-                    switch (tablePriority.getValue()) {
-                        case Down -> {
-                            double drop = Mint.mc.player.getY() - pos.getY();
-                            if (drop <= 0 || drop > tableDownRange.getValue()) continue;
-                            score = drop - dist * 0.01; // prefer lowest, tie-break by closeness
-                        }
-                        case Hole -> {
-                            boolean hole = WorldHelper.isHole(pos) || WorldHelper.isSafeHole(pos);
-                            if (!hole) continue;
-                            score = -dist; // among holes, closest
-                        }
-                        default -> score = -dist; // Closest
-                    }
-
-                    if (score > bestScore) {
-                        bestScore = score;
-                        best = pos;
-                    }
-                }
-            }
-        }
-        return best;
-    }
-
-    private void craftBeds(CraftingScreenHandler handler) {
-        int free = freeSlots(handler);
-        int cap = (int) Math.min(bedsPerCraft.getValue(), free - minFreeSlots.getValue());
-        if (cap <= 0) return;
-
-        for (int n = 0; n < cap; n++) {
-            int woolSlot = findIngredientSlot(handler, true);
-            int plankSlot = findIngredientSlot(handler, false);
-            if (woolSlot < 0 || plankSlot < 0) break;
-
-            // wool -> top row (grid slots 1,2,3)
-            click(handler, woolSlot, 0, SlotActionType.PICKUP);
-            click(handler, 1, 1, SlotActionType.PICKUP);
-            click(handler, 2, 1, SlotActionType.PICKUP);
-            click(handler, 3, 1, SlotActionType.PICKUP);
-            click(handler, woolSlot, 0, SlotActionType.PICKUP); // return remainder
-
-            // planks -> middle row (grid slots 4,5,6)
-            click(handler, plankSlot, 0, SlotActionType.PICKUP);
-            click(handler, 4, 1, SlotActionType.PICKUP);
-            click(handler, 5, 1, SlotActionType.PICKUP);
-            click(handler, 6, 1, SlotActionType.PICKUP);
-            click(handler, plankSlot, 0, SlotActionType.PICKUP);
-
-            // craft + move result to inventory
-            click(handler, 0, 0, SlotActionType.QUICK_MOVE);
-        }
-    }
-
-    private void click(ScreenHandler handler, int slot, int button, SlotActionType action) {
-        Mint.mc.interactionManager.clickSlot(handler.syncId, slot, button, action, Mint.mc.player);
-    }
-
-    // count empty player-inventory slots within the open handler (indices after the 3x3 grid)
-    private int freeSlots(CraftingScreenHandler handler) {
-        int free = 0;
-        for (int i = 10; i < handler.slots.size(); i++) {
-            if (handler.getSlot(i).getStack().isEmpty()) free++;
-        }
-        return free;
-    }
-
-    // find a player-inventory slot in the handler holding >=3 wool (same colour) or >=3 planks
-    private int findIngredientSlot(CraftingScreenHandler handler, boolean wool) {
-        int best = -1;
-        int bestCount = 2; // need at least 3
-        for (int i = 10; i < handler.slots.size(); i++) {
-            ItemStack stack = handler.getSlot(i).getStack();
-            if (stack.isEmpty()) continue;
-            boolean match = wool ? stack.isIn(ItemTags.WOOL) : stack.isIn(ItemTags.PLANKS);
-            if (!match) continue;
-            if (stack.getCount() > bestCount) {
-                bestCount = stack.getCount();
-                best = i;
-            }
-        }
-        return best;
     }
 
     private record ExistingBed(BlockPos pos, LivingEntity target, double damage) {}
