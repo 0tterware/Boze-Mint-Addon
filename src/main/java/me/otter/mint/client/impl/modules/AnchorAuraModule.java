@@ -58,7 +58,6 @@ public class AnchorAuraModule extends AddonModule {
     private final ModeOption<ToggleableSwapType> swapMode = new ModeOption<>(this, "SwapMode", "How to swap items into hand.", ToggleableSwapType.Silent);
     private final ToggleOption multiTask = new ToggleOption(this, "MultiTask", "Run while using items.", false);
     private final ToggleOption pauseOnUse = new ToggleOption(this, "PauseOnUse", "Pause while using an item", true);
-    private final ToggleOption fakeAir = new ToggleOption(this, "FakeAir", "Prevent ghost block rendering by setting block to air clientside", true);
 
     // Rotate
     private final ToggleOption rotate = new ToggleOption(this, "Rotate", "Rotate to the anchor before placing/interacting.", true);
@@ -208,7 +207,7 @@ public class AnchorAuraModule extends AddonModule {
                         range.getValue(), wallsRange.getValue(), strictDirection.getValue());
                 if (ph == null) { resetWork(); return; } // new spot
                 final int slot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
-                steps.add(() -> placedNow[0] = placeAnchorAt(slot, spot, false));
+                steps.add(() -> placedNow[0] = placeAnchorAt(slot, spot));
                 workOwns = true;
                 placedThisTick = true;
                 workPlaced = true;
@@ -255,7 +254,7 @@ public class AnchorAuraModule extends AddonModule {
                     && instantReplaceSafe(spot, target);
             if (replace) {
                 final int aSlot = findSlot(Blocks.RESPAWN_ANCHOR.asItem());
-                steps.add(() -> { if (detonatedNow[0]) placeAnchorAt(aSlot, spot, true); });
+                steps.add(() -> { if (detonatedNow[0]) placeAnchorAt(aSlot, spot); });
                 workPlaced = true;
                 workCharged = false;
                 workPlacedTick = tick;
@@ -382,8 +381,7 @@ public class AnchorAuraModule extends AddonModule {
                 () -> PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND));
     }
 
-    private boolean placeAnchorAt(int slot, BlockPos spot, boolean fake) {
-        if (fake && fakeAir.getValue()) Mint.mc.world.setBlockState(spot, Blocks.AIR.getDefaultState());
+    private boolean placeAnchorAt(int slot, BlockPos spot) {
         if (validate.getValue() && !WorldHelper.isReplaceable(spot)) return false;
         BlockHitResult hit = PlaceHelper.cast(spot, airPlace.getValue(), antiCheat.getValue(),
                 range.getValue(), wallsRange.getValue(), strictDirection.getValue());

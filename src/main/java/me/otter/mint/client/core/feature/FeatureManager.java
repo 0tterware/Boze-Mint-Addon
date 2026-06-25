@@ -11,6 +11,7 @@ import me.otter.mint.client.impl.extentions.*;
 import me.otter.mint.client.impl.modules.AnchorAuraModule;
 import me.otter.mint.client.impl.modules.AutoTNTModule;
 import me.otter.mint.client.impl.modules.AutoWitherModule;
+import me.otter.mint.client.impl.modules.BedAuraModule;
 
 public class FeatureManager {
 
@@ -19,6 +20,7 @@ public class FeatureManager {
         register(new AnchorAuraModule());
         register(new AutoTNTModule());
         register(new AutoWitherModule());
+        register(new BedAuraModule());
 
         // Extensions:
         register(new WorldTweaksExtension());
