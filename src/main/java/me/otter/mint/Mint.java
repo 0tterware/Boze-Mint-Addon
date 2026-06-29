@@ -47,6 +47,9 @@ public class Mint extends Addon {
         EVENT_BUS.registerLambdaFactory("me.otter.mint", (lookupInMethod, klass) ->
                 (MethodHandles.Lookup) lookupInMethod.invoke(null, klass, MethodHandles.lookup()));
 
+        // Custom Category
+        createCategory(NAME);
+
         // Register all features
         FeatureManager.registerFeatures();
         CapesManager.addSource(new CustomCapeSource(ID));

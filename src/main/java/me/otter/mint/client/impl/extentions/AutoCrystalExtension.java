@@ -37,7 +37,7 @@ public class AutoCrystalExtension extends ClientModuleExtension {
 
         if (renderPage != null) {
             targetRenderEnabled = new ToggleOption(parent, "TargetRender", "Render a box around AutoCrystal target.", true, renderPage);
-            // targetLineEnabled = new ToggleOption(parent, "TargetLine", "Render a line from the AutoCrystal place position to the target.", false, renderPage);
+            targetLineEnabled = new ToggleOption(parent, "TargetLine", "Render a line from the AutoCrystal place position to the target.", false, renderPage);
         }
 
         for (Option<?> option : parent.getOptions()) {
@@ -74,6 +74,8 @@ public class AutoCrystalExtension extends ClientModuleExtension {
         final Vec3 start = new Vec3(crystalPos.getX() + 0.5, crystalPos.getY() + 1.0, crystalPos.getZ() + 0.5);
         final Vec3 end = new Vec3((targetBox.minX + targetBox.maxX) / 2.0, targetBox.minY, (targetBox.minZ + targetBox.maxZ) / 2.0);
 
-        // TODO: complete onnce rrender method. fuck my keybboarrd is broken and double tying lletters
+        WorldDrawer.start();
+        WorldDrawer.line(autoCrystalColor.getValue(), start, end);
+        WorldDrawer.draw(event.matrices);
     }
 }
