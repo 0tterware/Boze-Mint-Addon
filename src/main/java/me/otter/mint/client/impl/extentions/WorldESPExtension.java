@@ -12,10 +12,10 @@ import dev.boze.api.render.TextDrawer;
 import dev.boze.api.render.TextType;
 import dev.boze.api.utility.EntityHelper;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.entity.TntEntity;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Comparator;
 import java.util.List;
@@ -38,14 +38,14 @@ public class WorldESPExtension extends ClientModuleExtension {
 
     @EventHandler
     public void onHudRender(EventHudRender event) {
-        if (mc.world == null || mc.player == null || !parentTntTimers.getValue()) {
+        if (mc.level == null || mc.player == null || !parentTntTimers.getValue()) {
             return;
         }
 
         renderTntTimers(event.context, event.tickDelta);
     }
 
-    public void renderTntTimers(DrawContext drawContext, float tickDelta) {
+    public void renderTntTimers(GuiGraphicsExtractor drawContext, float tickDelta) {
         double maxDist = maxDistance.getValue();
         int maxCount = maxEntities.getValue().intValue();
 
@@ -53,10 +53,10 @@ public class WorldESPExtension extends ClientModuleExtension {
             return;
         }
 
-        Box searchBox = mc.player.getBoundingBox().expand(maxDist);
+        AABB searchBox = mc.player.getBoundingBox().inflate(maxDist);
 
-        List<TntEntity> tnts = mc.world.getEntitiesByClass(
-                TntEntity.class,
+        List<PrimedTnt> tnts = mc.level.getEntitiesOfClass(
+                PrimedTnt.class,
                 searchBox,
                 tnt -> EntityHelper.isWithinRange(tnt, maxDist)
         );
@@ -69,20 +69,20 @@ public class WorldESPExtension extends ClientModuleExtension {
             tnts = tnts.subList(0, maxCount);
         }
 
-        for (TntEntity tnt : tnts) {
+        for (PrimedTnt tnt : tnts) {
             renderSingleTnt(tnt, drawContext, tickDelta);
         }
     }
 
-    private void renderSingleTnt(TntEntity tnt, DrawContext ctx, float tickDelta) {
+    private void renderSingleTnt(PrimedTnt tnt, GuiGraphicsExtractor ctx, float tickDelta) {
         if (tnt.isRemoved()) return;
 
         if (!EntityHelper.isWithinRange(tnt, maxDistance.getValue())) {
             return;
         }
 
-        Vec3d basePos = EntityHelper.getInterpolatedPos(tnt, tickDelta);
-        Vec3d labelPos = basePos.add(0.0, heightOffset.getValue(), 0.0);
+        Vec3 basePos = EntityHelper.getInterpolatedPos(tnt, tickDelta);
+        Vec3 labelPos = basePos.add(0.0, heightOffset.getValue(), 0.0);
 
         int fuseTicks = tnt.getFuse();
         if (fuseTicks < 0) return;

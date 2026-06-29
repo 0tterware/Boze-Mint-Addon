@@ -5,7 +5,7 @@ import dev.boze.api.utility.ChatHelper;
 import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.impl.extentions.OptionsExtension;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screens.ChatScreen;
 import org.lwjgl.glfw.GLFW;
 
 import static me.otter.mint.Mint.mc;
@@ -25,7 +25,7 @@ public class InstantPrefixListener {
         final String keyName = GLFW.glfwGetKeyName(event.bind, 0);
         if (keyName == null || !keyName.equalsIgnoreCase(prefix)) return;
 
-        if (mc.currentScreen == null) {
+        if (mc.screen == null) {
             event.setCancelled(true);
             mc.setScreen(new ChatScreen("", false));
         }

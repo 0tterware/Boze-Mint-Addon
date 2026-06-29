@@ -11,7 +11,7 @@ import me.otter.mint.client.impl.listeners.InstantPrefixListener;
 import meteordevelopment.orbit.EventBus;
 import meteordevelopment.orbit.IEventBus;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,7 +27,7 @@ public class Mint extends Addon {
     public static final IEventBus EVENT_BUS = new EventBus();
 
     public static final Mint INSTANCE = new Mint();
-    public static MinecraftClient mc;
+    public static Minecraft mc;
 
     public static final ClientColor CLIENT_COLOR = ColorMaker.staticColor(60, 170, 120);
     public static final float MAIN_FILL_OPACITY = 0.4f;
@@ -40,7 +40,7 @@ public class Mint extends Addon {
     @Override
     public boolean initialize() {
         LOGGER.info("Initializing {}", name);
-        mc = MinecraftClient.getInstance();
+        mc = Minecraft.getInstance();
 
         BozeInstance.INSTANCE.registerPackage("me.otter.mint");
 

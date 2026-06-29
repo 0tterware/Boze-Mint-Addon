@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "me.otter.mint.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "BlockModelRenderStateAccessor",
+    "ClientLevelInvoker"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

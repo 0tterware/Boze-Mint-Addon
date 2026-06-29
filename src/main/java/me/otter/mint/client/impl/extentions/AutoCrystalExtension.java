@@ -10,10 +10,10 @@ import dev.boze.api.option.PageOption;
 import dev.boze.api.option.ToggleOption;
 import dev.boze.api.render.WorldDrawer;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import static me.otter.mint.Mint.mc;
 
@@ -49,12 +49,12 @@ public class AutoCrystalExtension extends ClientModuleExtension {
 
     @EventHandler
     public void onWorldRender(EventWorldRender event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         final LivingEntity target = AutoCrystalHelper.getTarget();
         if (target == null) return;
 
-        final Box targetBox = target.getBoundingBox();
+        final AABB targetBox = target.getBoundingBox();
 
         if (targetRenderEnabled != null && targetRenderEnabled.getValue()) {
             WorldDrawer.start();
@@ -70,11 +70,9 @@ public class AutoCrystalExtension extends ClientModuleExtension {
         }
     }
 
-    private void renderTargetLine(EventWorldRender event, BlockPos crystalPos, Box targetBox) {
-        // Top center
-        final Vec3d start = new Vec3d(crystalPos.getX() + 0.5, crystalPos.getY() + 1.0, crystalPos.getZ() + 0.5);
-        // Bottom center
-        final Vec3d end = new Vec3d((targetBox.minX + targetBox.maxX) / 2.0, targetBox.minY, (targetBox.minZ + targetBox.maxZ) / 2.0);
+    private void renderTargetLine(EventWorldRender event, BlockPos crystalPos, AABB targetBox) {
+        final Vec3 start = new Vec3(crystalPos.getX() + 0.5, crystalPos.getY() + 1.0, crystalPos.getZ() + 0.5);
+        final Vec3 end = new Vec3((targetBox.minX + targetBox.maxX) / 2.0, targetBox.minY, (targetBox.minZ + targetBox.maxZ) / 2.0);
 
         // TODO: complete onnce rrender method. fuck my keybboarrd is broken and double tying lletters
     }

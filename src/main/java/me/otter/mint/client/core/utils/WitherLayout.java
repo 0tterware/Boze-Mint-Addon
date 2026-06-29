@@ -3,8 +3,8 @@ package me.otter.mint.client.core.utils;
 import dev.boze.api.utility.WorldHelper;
 import dev.boze.api.utility.interaction.PlaceHelper;
 import me.otter.mint.Mint;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +35,8 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
                     soulBlocks.add(middle.north());
                     soulBlocks.add(middle.south());
                 } else if (witherArmAxis == WitherArmAxis.UpDown) {
-                    soulBlocks.add(middle.up());
-                    soulBlocks.add(middle.down());
+                    soulBlocks.add(middle.above());
+                    soulBlocks.add(middle.below());
                 }
             }
             case SideNorth, SideSouth -> {
@@ -44,8 +44,8 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
                     soulBlocks.add(middle.east());
                     soulBlocks.add(middle.west());
                 } else if (witherArmAxis == WitherArmAxis.UpDown) {
-                    soulBlocks.add(middle.up());
-                    soulBlocks.add(middle.down());
+                    soulBlocks.add(middle.above());
+                    soulBlocks.add(middle.below());
                 }
             }
         }
@@ -74,8 +74,8 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
                     skullBlocks.add(middleSkull.east());
                     skullBlocks.add(middleSkull.west());
                 } else if (witherArmAxis == WitherArmAxis.UpDown) {
-                    skullBlocks.add(middleSkull.up());
-                    skullBlocks.add(middleSkull.down());
+                    skullBlocks.add(middleSkull.above());
+                    skullBlocks.add(middleSkull.below());
                 }
             }
             case SideEast, SideWest -> {
@@ -83,8 +83,8 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
                     skullBlocks.add(middleSkull.north());
                     skullBlocks.add(middleSkull.south());
                 } else if (witherArmAxis == WitherArmAxis.UpDown) {
-                    skullBlocks.add(middleSkull.up());
-                    skullBlocks.add(middleSkull.down());
+                    skullBlocks.add(middleSkull.above());
+                    skullBlocks.add(middleSkull.below());
                 }
             }
         }
@@ -99,38 +99,38 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
         switch (witherDirection) {
             case Up -> {
                 if (witherArmAxis == WitherArmAxis.EastWest) {
-                    airBlocks.add(middle.east().down());
-                    airBlocks.add(middle.west().down());
+                    airBlocks.add(middle.east().below());
+                    airBlocks.add(middle.west().below());
                 } else if (witherArmAxis == WitherArmAxis.NorthSouth) {
-                    airBlocks.add(middle.north().down());
-                    airBlocks.add(middle.south().down());
+                    airBlocks.add(middle.north().below());
+                    airBlocks.add(middle.south().below());
                 }
             }
             case Down -> {
                 if (witherArmAxis == WitherArmAxis.EastWest) {
-                    airBlocks.add(middle.east().up());
-                    airBlocks.add(middle.west().up());
+                    airBlocks.add(middle.east().above());
+                    airBlocks.add(middle.west().above());
                 } else if (witherArmAxis == WitherArmAxis.NorthSouth) {
-                    airBlocks.add(middle.north().up());
-                    airBlocks.add(middle.south().up());
+                    airBlocks.add(middle.north().above());
+                    airBlocks.add(middle.south().above());
                 }
             }
             case SideNorth, SideSouth -> {
                 if (witherArmAxis == WitherArmAxis.UpDown) {
-                    airBlocks.add(middle.up().offset(back));
-                    airBlocks.add(middle.down().offset(back));
+                    airBlocks.add(middle.above().relative(back));
+                    airBlocks.add(middle.below().relative(back));
                 } else {
-                    airBlocks.add(middle.east().offset(back));
-                    airBlocks.add(middle.west().offset(back));
+                    airBlocks.add(middle.east().relative(back));
+                    airBlocks.add(middle.west().relative(back));
                 }
             }
             case SideWest, SideEast -> {
                 if (witherArmAxis == WitherArmAxis.UpDown) {
-                    airBlocks.add(middle.up().offset(back));
-                    airBlocks.add(middle.down().offset(back));
+                    airBlocks.add(middle.above().relative(back));
+                    airBlocks.add(middle.below().relative(back));
                 } else {
-                    airBlocks.add(middle.north().offset(back));
-                    airBlocks.add(middle.south().offset(back));
+                    airBlocks.add(middle.north().relative(back));
+                    airBlocks.add(middle.south().relative(back));
                 }
             }
         }
@@ -139,12 +139,12 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
 
     private BlockPos getMiddle(BlockPos base) {
         return switch (witherDirection) {
-            case Up -> base.up();
-            case Down -> base.down();
-            case SideNorth -> base.offset(Direction.NORTH);
-            case SideSouth -> base.offset(Direction.SOUTH);
-            case SideEast -> base.offset(Direction.EAST);
-            case SideWest -> base.offset(Direction.WEST);
+            case Up -> base.above();
+            case Down -> base.below();
+            case SideNorth -> base.relative(Direction.NORTH);
+            case SideSouth -> base.relative(Direction.SOUTH);
+            case SideEast -> base.relative(Direction.EAST);
+            case SideWest -> base.relative(Direction.WEST);
         };
     }
 
@@ -181,7 +181,7 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
     private static boolean hasSupport(List<BlockPos> positions) {
         for (BlockPos p : positions) {
             for (Direction dir : Direction.values()) {
-                if (!WorldHelper.isReplaceable(p.offset(dir))) return true;
+                if (!WorldHelper.isReplaceable(p.relative(dir))) return true;
             }
         }
         return false;
@@ -197,7 +197,7 @@ public record WitherLayout(WitherDirection witherDirection, WitherArmAxis wither
 
     private static boolean allAir(List<BlockPos> positions) {
         for (BlockPos p : positions) {
-            if (!Mint.mc.world.getBlockState(p).isAir()) return false;
+            if (!Mint.mc.level.getBlockState(p).isAir()) return false;
         }
         return true;
     }

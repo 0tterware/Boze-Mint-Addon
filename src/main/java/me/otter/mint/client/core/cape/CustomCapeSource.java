@@ -4,7 +4,7 @@ import com.mojang.authlib.GameProfile;
 import dev.boze.api.utility.cape.CapeLoadResult;
 import dev.boze.api.utility.cape.CapeSource;
 import me.otter.mint.Mint;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 
 import java.net.MalformedURLException;
 import java.net.URI;

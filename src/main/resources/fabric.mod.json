@@ -11,11 +11,12 @@
   "license": "All-Rights-Reserved",
   "icon": "assets/mint/icon.png",
   "environment": "*",
-  "accessWidener": "mint.accesswidener",
   "mixins": [
-    "mint.mixins.json"
+    "mint.mixins.json",
+    "mint.accessors.mixins.json"
   ],
   "depends": {
+    "fabricloader": ">=${loader_version}",
     "minecraft": "${minecraft_version}"
   }
 }

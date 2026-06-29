@@ -4,7 +4,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.boze.api.addon.AddonCommand;
 import dev.boze.api.utility.ChatHelper;
 import me.otter.mint.Mint;
-import net.minecraft.command.CommandSource;
+import net.minecraft.commands.SharedSuggestionProvider;
 
 import java.util.Random;
 
@@ -17,7 +17,7 @@ public class CoinFlipCommand extends AddonCommand {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<SharedSuggestionProvider> builder) {
         builder.executes(context -> {
             boolean rand = random.nextBoolean();
 
@@ -27,7 +27,7 @@ public class CoinFlipCommand extends AddonCommand {
                         // (int) Mint.mc.player.getY(),
                         // (int) Mint.mc.player.getZ()
                 );
-                Mint.mc.getNetworkHandler().sendChatMessage(msg);
+                Mint.mc.getConnection().sendChat(msg);
             } else {
                 ChatHelper.sendMsg("Coinflip", "You won c:");
             }

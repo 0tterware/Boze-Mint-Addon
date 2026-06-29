@@ -14,13 +14,13 @@ import me.otter.mint.client.core.feature.RenderSettings;
 import me.otter.mint.client.core.utils.WitherLayout;
 import me.otter.mint.Mint;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 
@@ -84,7 +84,7 @@ public class AutoWitherModule extends AddonModule {
 
     @EventHandler
     private void onInteract(EventInteract event) {
-        if (Mint.mc.world == null || Mint.mc.player == null) return;
+        if (Mint.mc.level == null || Mint.mc.player == null) return;
         if (event.getMode() != interactionMode.getValue()) return;
 
         ticksSincePlace++;
@@ -111,12 +111,12 @@ public class AutoWitherModule extends AddonModule {
     private boolean pickLayoutOnceMode() {
         if (!mouseOnce.getValue()) return pickLayoutAutoMode();
 
-        HitResult hr = Mint.mc.crosshairTarget;
+        HitResult hr = Mint.mc.hitResult;
         if (!(hr instanceof BlockHitResult bhr) || bhr.getType() != HitResult.Type.BLOCK) return false;
 
-        BlockPos base = bhr.getBlockPos().offset(bhr.getSide());
+        BlockPos base = bhr.getBlockPos().relative(bhr.getDirection());
 
-        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        final Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
         final double r2 = placeRange.getValue() * placeRange.getValue();
         final double minR2 = minRange.getValue() * minRange.getValue();
 
@@ -138,8 +138,8 @@ public class AutoWitherModule extends AddonModule {
         final int ri = (int) Math.ceil(r);
         final double r2 = r * r;
         final double minR2 = minRange.getValue() * minRange.getValue();
-        final BlockPos center = Mint.mc.player.getBlockPos();
-        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        final BlockPos center = Mint.mc.player.blockPosition();
+        final Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
 
         if (!anySolidInRange(center, ri, r2, eye)) return false;
 
@@ -148,7 +148,7 @@ public class AutoWitherModule extends AddonModule {
         for (int dx = -ri; dx <= ri; dx++) {
             for (int dy = -ri; dy <= ri; dy++) {
                 for (int dz = -ri; dz <= ri; dz++) {
-                    BlockPos base = center.add(dx, dy, dz);
+                    BlockPos base = center.offset(dx, dy, dz);
 
                     // sphere prune + cheap solid-terrain prune before the heavy layout scan
                     if (sqDistToCenter(eye, base) > r2) continue;
@@ -184,11 +184,11 @@ public class AutoWitherModule extends AddonModule {
 
     private record Cand(BlockPos base, WitherLayout layout, List<BlockPos> souls, double metric) {}
 
-    private static boolean anySolidInRange(BlockPos center, int ri, double r2, Vec3d eye) {
+    private static boolean anySolidInRange(BlockPos center, int ri, double r2, Vec3 eye) {
         for (int dx = -ri; dx <= ri; dx++) {
             for (int dy = -ri; dy <= ri; dy++) {
                 for (int dz = -ri; dz <= ri; dz++) {
-                    BlockPos p = center.add(dx, dy, dz);
+                    BlockPos p = center.offset(dx, dy, dz);
                     if (sqDistToCenter(eye, p) > r2) continue;
                     if (!WorldHelper.isReplaceable(p)) return true;
                 }
@@ -197,7 +197,7 @@ public class AutoWitherModule extends AddonModule {
         return false;
     }
 
-    private static boolean withinRanges(Vec3d eye, List<BlockPos> souls, List<BlockPos> skulls, double r2, double minR2) {
+    private static boolean withinRanges(Vec3 eye, List<BlockPos> souls, List<BlockPos> skulls, double r2, double minR2) {
         for (BlockPos p : souls) {
             double d2 = sqDistToCenter(eye, p);
             if (d2 > r2 || d2 < minR2) return false;
@@ -237,7 +237,7 @@ public class AutoWitherModule extends AddonModule {
         }
 
         // Abandon if the player moved
-        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        final Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
         final double cancel = placeRange.getValue() + cancelExtra.getValue();
         if (anyOutOfReach(eye, cancel * cancel)) {
             abandon("Blocks out of reach.");
@@ -273,7 +273,7 @@ public class AutoWitherModule extends AddonModule {
         Runnable placeAction = () -> {
             if (swapMode.getValue() != ToggleableSwapType.Off) InvHelper.swapToSlot(placeSlot, swapMode.getValue());
 
-            PlaceHelper.place(interactionMode.getValue(), hit, Hand.MAIN_HAND);
+            PlaceHelper.place(interactionMode.getValue(), hit, InteractionHand.MAIN_HAND);
 
             if (swapMode.getValue() != ToggleableSwapType.Off) InvHelper.swapBack();
 
@@ -284,7 +284,7 @@ public class AutoWitherModule extends AddonModule {
         };
 
         if (rotate.getValue()) {
-            float[] rot = MathHelper.calculateRotation(eye, hit.getPos());
+            float[] rot = MathHelper.calculateRotation(eye, hit.getLocation());
             event.addInteraction(new Interaction(placeAction, rot[0], rot[1]));
         } else {
             event.addInteraction(new Interaction(placeAction));
@@ -293,13 +293,13 @@ public class AutoWitherModule extends AddonModule {
         ticksSincePlace = 0;
     }
 
-    private boolean anyOutOfReach(Vec3d eye, double cancelSq) {
+    private boolean anyOutOfReach(Vec3 eye, double cancelSq) {
         for (BlockPos p : sandQueue) if (sqDistToCenter(eye, p) > cancelSq) return true;
         for (BlockPos p : skullQueue) if (sqDistToCenter(eye, p) > cancelSq) return true;
         return false;
     }
 
-    private Placeable pickNearestPlaceable(List<BlockPos> pool, boolean skullPhase, Vec3d eye) {
+    private Placeable pickNearestPlaceable(List<BlockPos> pool, boolean skullPhase, Vec3 eye) {
         return pool.stream()
                 .sorted(Comparator.comparingDouble(p -> sqDistToCenter(eye, p)))
                 .map(p -> new Placeable(p, skullPhase ? hitForSkull(p) : castFor(p)))
@@ -340,9 +340,9 @@ public class AutoWitherModule extends AddonModule {
         if (!WorldHelper.isReplaceable(skullPos) || !PlaceHelper.isEmpty(skullPos)) return null;
 
         for (Direction dir : Direction.values()) {
-            BlockPos neighbour = skullPos.offset(dir);
-            if (Mint.mc.world.getBlockState(neighbour).isOf(Blocks.SOUL_SAND)) {
-                Vec3d hitVec = new Vec3d(neighbour.getX() + 0.5, neighbour.getY() + 0.5, neighbour.getZ() + 0.5);
+            BlockPos neighbour = skullPos.relative(dir);
+            if (Mint.mc.level.getBlockState(neighbour).is(Blocks.SOUL_SAND)) {
+                Vec3 hitVec = new Vec3(neighbour.getX() + 0.5, neighbour.getY() + 0.5, neighbour.getZ() + 0.5);
                 return new BlockHitResult(hitVec, dir.getOpposite(), neighbour, false);
             }
         }
@@ -350,8 +350,8 @@ public class AutoWitherModule extends AddonModule {
     }
 
     private boolean holdingCorrect(boolean skull) {
-        var stack = Mint.mc.player.getMainHandStack();
-        return stack != null && stack.isOf((skull ? Blocks.WITHER_SKELETON_SKULL : Blocks.SOUL_SAND).asItem());
+        var stack = Mint.mc.player.getMainHandItem();
+        return stack != null && stack.is((skull ? Blocks.WITHER_SKELETON_SKULL : Blocks.SOUL_SAND).asItem());
     }
 
     private int findSlot(boolean skull) {
@@ -359,14 +359,14 @@ public class AutoWitherModule extends AddonModule {
         return swapMode.getValue() == ToggleableSwapType.Alt ? InvHelper.find(block) : InvHelper.findInHotbar(block);
     }
 
-    private static double sqDistToCenter(Vec3d eye, BlockPos p) {
+    private static double sqDistToCenter(Vec3 eye, BlockPos p) {
         double dx = (p.getX() + 0.5) - eye.x;
         double dy = (p.getY() + 0.5) - eye.y;
         double dz = (p.getZ() + 0.5) - eye.z;
         return dx * dx + dy * dy + dz * dz;
     }
 
-    private static double avgSqDist(Vec3d eye, List<BlockPos> souls, List<BlockPos> skulls) {
+    private static double avgSqDist(Vec3 eye, List<BlockPos> souls, List<BlockPos> skulls) {
         double sum = 0.0;
         for (BlockPos p : souls) sum += sqDistToCenter(eye, p);
         for (BlockPos p : skulls) sum += sqDistToCenter(eye, p);

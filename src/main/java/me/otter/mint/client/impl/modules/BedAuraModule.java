@@ -15,28 +15,28 @@ import dev.boze.api.utility.interaction.ToggleableSwapType;
 import me.otter.mint.Mint;
 import me.otter.mint.client.core.utils.DamageUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.BedBlock;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.BedItem;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.PlayerInput;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BedItem;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -159,9 +159,9 @@ public class BedAuraModule extends AddonModule {
 
     @EventHandler
     private void onInteract(EventInteract event) {
-        if (Mint.mc.player == null || Mint.mc.world == null) return;
+        if (Mint.mc.player == null || Mint.mc.level == null) return;
         if (event.getMode() != antiCheat.getValue()) return;
-        if (Mint.mc.world.getRegistryKey() == World.OVERWORLD) return; // beds only explode in the Nether/End
+        if (Mint.mc.level.dimension() == Level.OVERWORLD) return; // beds only explode in the Nether/End
         if (!multiTask.getValue() && pauseOnUse.getValue() && Mint.mc.player.isUsingItem()) return;
         if (EntityHelper.getHealth(Mint.mc.player) <= minHealth.getValue()) return;
 
@@ -205,8 +205,8 @@ public class BedAuraModule extends AddonModule {
         if (!EntityHelper.isAlive(lockTarget) || EntityHelper.getHealth(lockTarget) <= 0) return false;
         if (EntityHelper.isFriend(lockTarget)) return false;
 
-        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
-        if (Vec3d.ofCenter(lockTarget.getBlockPos()).distanceTo(eye) > targetRange.getValue() + 1.0
+        Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
+        if (Vec3.atCenterOf(lockTarget.blockPosition()).distanceTo(eye) > targetRange.getValue() + 1.0
                 && lockTarget.distanceTo(Mint.mc.player) > targetRange.getValue() + 1.0) return false;
 
         if (lockAdopt) return bedAtLock() != null; // valid while a reachable, adoptable bed remains
@@ -240,7 +240,7 @@ public class BedAuraModule extends AddonModule {
         if (best == null) return false;
         lockFoot = best.foot;
         lockDir = best.dir;
-        lockHead = best.foot.offset(best.dir);
+        lockHead = best.foot.relative(best.dir);
         lockTarget = best.target;
         lockAdopt = false;
         lockExpectBed = false;
@@ -249,8 +249,8 @@ public class BedAuraModule extends AddonModule {
     }
 
     private BlockPos otherBedHalf(BlockPos bedPos) {
-        for (Direction d : Direction.Type.HORIZONTAL) {
-            if (isBedBlock(bedPos.offset(d))) return bedPos.offset(d);
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            if (isBedBlock(bedPos.relative(d))) return bedPos.relative(d);
         }
         return null;
     }
@@ -275,14 +275,14 @@ public class BedAuraModule extends AddonModule {
 
         ExistingBed best = null;
         for (LivingEntity target : targets) {
-            BlockPos center = target.getBlockPos();
-            Vec3d targetCenter = target.getBoundingBox().getCenter();
+            BlockPos center = target.blockPosition();
+            Vec3 targetCenter = target.getBoundingBox().getCenter();
             for (int ox = -r; ox <= r; ox++) {
                 for (int oy = -r; oy <= r; oy++) {
                     for (int oz = -r; oz <= r; oz++) {
-                        BlockPos pos = center.add(ox, oy, oz);
+                        BlockPos pos = center.offset(ox, oy, oz);
                         if (!isBedBlock(pos)) continue;
-                        if (Vec3d.ofCenter(pos).distanceTo(targetCenter) > 6.0) continue;
+                        if (Vec3.atCenterOf(pos).distanceTo(targetCenter) > 6.0) continue;
                         if (!withinReach(pos, exR)) continue;
 
                         double self = selfDamage(pos);
@@ -301,21 +301,21 @@ public class BedAuraModule extends AddonModule {
     private PlaceData findPlace() {
         final double exReach = Math.max(range.getValue(), wallsRange.getValue());
         final int r = (int) Math.ceil(bedRange.getValue());
-        final Direction only = rotate.getValue() ? null : Direction.fromHorizontalDegrees(Mint.mc.player.getYaw());
+        final Direction only = rotate.getValue() ? null : Direction.fromYRot(Mint.mc.player.getYRot());
 
         PlaceData best = null;
         for (LivingEntity target : targets) {
-            BlockPos center = target.getBlockPos();
-            Vec3d targetCenter = target.getBoundingBox().getCenter();
+            BlockPos center = target.blockPosition();
+            Vec3 targetCenter = target.getBoundingBox().getCenter();
             for (int ox = -r; ox <= r; ox++) {
                 for (int oy = -r; oy <= r; oy++) {
                     for (int oz = -r; oz <= r; oz++) {
-                        BlockPos foot = center.add(ox, oy, oz);
+                        BlockPos foot = center.offset(ox, oy, oz);
                         if (!footPlaceable(foot, exReach)) continue;
 
-                        for (Direction dir : Direction.Type.HORIZONTAL) {
+                        for (Direction dir : Direction.Plane.HORIZONTAL) {
                             if (only != null && dir != only) continue;
-                            BlockPos head = foot.offset(dir);
+                            BlockPos head = foot.relative(dir);
                             if (!headPlaceable(head)) continue;
 
                             // bed explodes wherever you interact it; detonate the half that hurts the target most
@@ -331,7 +331,7 @@ public class BedAuraModule extends AddonModule {
 
                             // bias toward driving the head into the target's space
                             double score = dmg;
-                            if (Vec3d.ofCenter(head).distanceTo(targetCenter) < Vec3d.ofCenter(foot).distanceTo(targetCenter))
+                            if (Vec3.atCenterOf(head).distanceTo(targetCenter) < Vec3.atCenterOf(foot).distanceTo(targetCenter))
                                 score += 0.01;
 
                             if (best == null || score > best.score)
@@ -351,7 +351,7 @@ public class BedAuraModule extends AddonModule {
         if (!WorldHelper.canPlaceAt(foot)) return false;
         if (!WorldHelper.isValidPlacement(foot, Blocks.WHITE_BED)) return false;
         if (!PlaceHelper.isEmpty(foot)) return false;
-        if (!airPlace.getValue() && WorldHelper.isReplaceable(foot.down())) return false; // need a floor
+        if (!airPlace.getValue() && WorldHelper.isReplaceable(foot.below())) return false; // need a floor
         return true;
     }
 
@@ -409,13 +409,13 @@ public class BedAuraModule extends AddonModule {
         lockActionTick = tick;
         lockExpectBed = true;
 
-        float yaw = lockDir.getPositiveHorizontalDegrees();
-        float pitch = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), hit.getPos())[1];
+        float yaw = lockDir.toYRot();
+        float pitch = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), hit.getLocation())[1];
         submitRotated(event, action, yaw, pitch);
     }
 
     private boolean instantReplaceSafe(BlockPos foot, Direction dir, LivingEntity target) {
-        BlockPos head = foot.offset(dir);
+        BlockPos head = foot.relative(dir);
         double dFoot = enemyDamage(target, foot);
         double dHead = enemyDamage(target, head);
         BlockPos detonate = dHead >= dFoot ? head : foot;
@@ -434,7 +434,7 @@ public class BedAuraModule extends AddonModule {
         final int slot = findBedSlot();
 
         Runnable action = () -> {
-            if (validate.getValue() && (!WorldHelper.isReplaceable(foot) || !WorldHelper.isReplaceable(foot.offset(dir)))) return;
+            if (validate.getValue() && (!WorldHelper.isReplaceable(foot) || !WorldHelper.isReplaceable(foot.relative(dir)))) return;
             placeBed(slot, hit);
         };
 
@@ -443,9 +443,9 @@ public class BedAuraModule extends AddonModule {
         lockExpectBed = true;
         displayTarget = lockTarget;
 
-        // a bed faces the player's yaw; set yaw so the head lands at foot.offset(dir) (into the target)
-        float yaw = dir.getPositiveHorizontalDegrees();
-        float pitch = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), hit.getPos())[1];
+        // a bed faces the player's yaw; set yaw so the head lands at foot.relative(dir) (into the target)
+        float yaw = dir.toYRot();
+        float pitch = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), hit.getLocation())[1];
         submitRotated(event, action, yaw, pitch);
     }
 
@@ -456,8 +456,8 @@ public class BedAuraModule extends AddonModule {
     }
 
     private void interactOtherHalf(BlockPos bedPos, int slot) {
-        for (Direction dir : Direction.Type.HORIZONTAL) {
-            BlockPos other = bedPos.offset(dir);
+        for (Direction dir : Direction.Plane.HORIZONTAL) {
+            BlockPos other = bedPos.relative(dir);
             if (isBedBlock(other) && withinReach(other, Math.max(range.getValue(), wallsRange.getValue()))) {
                 BlockHitResult face = computeBedFace(other);
                 if (face != null) useOnBlock(slot, face, NOT_BED);
@@ -471,8 +471,8 @@ public class BedAuraModule extends AddonModule {
     }
 
     private boolean entityAt(BlockPos pos) {
-        Box box = new Box(pos);
-        for (Entity e : Mint.mc.world.getEntities()) {
+        AABB box = new AABB(pos);
+        for (Entity e : Mint.mc.level.entitiesForRendering()) {
             if (e == Mint.mc.player) continue;
             if (e instanceof ItemEntity) continue;
             if (!e.isAlive()) continue;
@@ -485,16 +485,16 @@ public class BedAuraModule extends AddonModule {
         if (airPlace.getValue()) {
             return PlaceHelper.cast(foot, true, antiCheat.getValue(), range.getValue(), wallsRange.getValue(), strictDirection.getValue());
         }
-        BlockPos support = foot.down();
+        BlockPos support = foot.below();
         if (WorldHelper.isReplaceable(support)) return null;
         if (!withinReach(foot, Math.max(range.getValue(), wallsRange.getValue()))) return null;
-        Vec3d hitVec = new Vec3d(foot.getX() + 0.5, foot.getY(), foot.getZ() + 0.5);
+        Vec3 hitVec = new Vec3(foot.getX() + 0.5, foot.getY(), foot.getZ() + 0.5);
         return new BlockHitResult(hitVec, Direction.UP, support, false);
     }
 
     private boolean placeBed(int slot, BlockHitResult hit) {
         return performStep(slot, s -> s.getItem() instanceof BedItem,
-                () -> PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND));
+                () -> PlaceHelper.place(antiCheat.getValue(), hit, InteractionHand.MAIN_HAND));
     }
 
     private boolean useOnBlock(int slot, BlockHitResult hit, Predicate<ItemStack> heldOk) {
@@ -505,7 +505,7 @@ public class BedAuraModule extends AddonModule {
         ToggleableSwapType mode = swapMode.getValue();
 
         if (mode == ToggleableSwapType.Off) {
-            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false;
+            if (!heldOk.test(Mint.mc.player.getMainHandItem())) return false;
             action.run();
             return true;
         }
@@ -521,10 +521,10 @@ public class BedAuraModule extends AddonModule {
         // Silent / Alt
         boolean swapped = InvHelper.swapToSlot(slot, mode);
         if (!swapped) {
-            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false;
-            if (Mint.mc.getNetworkHandler() != null) {
-                Mint.mc.getNetworkHandler().sendPacket(
-                        new UpdateSelectedSlotC2SPacket(Mint.mc.player.getInventory().getSelectedSlot()));
+            if (!heldOk.test(Mint.mc.player.getMainHandItem())) return false;
+            if (Mint.mc.getConnection() != null) {
+                Mint.mc.getConnection().send(
+                        new ServerboundSetCarriedItemPacket(Mint.mc.player.getInventory().getSelectedSlot()));
             }
         }
         try {
@@ -539,29 +539,29 @@ public class BedAuraModule extends AddonModule {
         try {
             sendInteract(hit);
         } catch (Throwable t) {
-            Mint.mc.interactionManager.interactBlock(Mint.mc.player, Hand.MAIN_HAND, hit);
+            Mint.mc.gameMode.useItemOn(Mint.mc.player, InteractionHand.MAIN_HAND, hit);
         }
-        Mint.mc.player.swingHand(Hand.MAIN_HAND);
+        Mint.mc.player.swing(InteractionHand.MAIN_HAND);
     }
 
     private void sendInteract(BlockHitResult hit) {
-        if (Mint.mc.getNetworkHandler() == null || Mint.mc.world == null) return;
-        try (PendingUpdateManager pum = Mint.mc.world.getPendingUpdateManager().incrementSequence()) {
-            Mint.mc.getNetworkHandler().sendPacket(
-                    new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, hit, pum.getSequence()));
+        if (Mint.mc.getConnection() == null || Mint.mc.level == null) return;
+        try (BlockStatePredictionHandler pum = ((me.otter.mint.mixin.ClientLevelInvoker) Mint.mc.level).mint$getBlockStatePredictionHandler().startPredicting()) {
+            Mint.mc.getConnection().send(
+                    new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, hit, pum.currentSequence()));
         }
     }
 
     private void sendSneak(boolean sneaking) {
-        if (Mint.mc.getNetworkHandler() == null) return;
-        PlayerInput cur = Mint.mc.player.input.playerInput;
-        PlayerInput modified = new PlayerInput(cur.forward(), cur.backward(), cur.left(), cur.right(), cur.jump(), sneaking, cur.sprint());
-        Mint.mc.getNetworkHandler().sendPacket(new PlayerInputC2SPacket(modified));
+        if (Mint.mc.getConnection() == null) return;
+        Input cur = Mint.mc.player.input.keyPresses;
+        Input modified = new Input(cur.forward(), cur.backward(), cur.left(), cur.right(), cur.jump(), sneaking, cur.sprint());
+        Mint.mc.getConnection().send(new ServerboundPlayerInputPacket(modified));
     }
 
     private Runnable wrap(Runnable action) {
         return () -> {
-            boolean wasSneaking = Mint.mc.player.isSneaking();
+            boolean wasSneaking = Mint.mc.player.isShiftKeyDown();
             if (wasSneaking) sendSneak(false);
             try {
                 action.run();
@@ -571,7 +571,7 @@ public class BedAuraModule extends AddonModule {
         };
     }
 
-    private void submit(EventInteract event, Runnable action, Vec3d aim) {
+    private void submit(EventInteract event, Runnable action, Vec3 aim) {
         Runnable seq = wrap(action);
         if (rotate.getValue()) {
             float[] rot = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), aim);
@@ -590,10 +590,10 @@ public class BedAuraModule extends AddonModule {
         }
     }
 
-    private Vec3d aimVec(BlockPos pos) {
+    private Vec3 aimVec(BlockPos pos) {
         return aimPoint.getValue() == AimPoint.Nearest
-                ? MathHelper.closestPointToBox(EntityHelper.getEyePos(Mint.mc.player), new Box(pos))
-                : Vec3d.ofCenter(pos);
+                ? MathHelper.closestPointToBox(EntityHelper.getEyePos(Mint.mc.player), new AABB(pos))
+                : Vec3.atCenterOf(pos);
     }
 
     @EventHandler
@@ -609,11 +609,11 @@ public class BedAuraModule extends AddonModule {
     }
 
     private double enemyDamage(LivingEntity target, BlockPos pos) {
-        return DamageUtils.explosionDamage(target, Vec3d.ofCenter(pos), 10f, predict.getValue(), DamageUtils.HIT_FACTORY, assumeMaxArmor.getValue());
+        return DamageUtils.explosionDamage(target, Vec3.atCenterOf(pos), 10f, predict.getValue(), DamageUtils.HIT_FACTORY, assumeMaxArmor.getValue());
     }
 
     private double selfDamage(BlockPos pos) {
-        return DamageUtils.explosionDamage(Mint.mc.player, Vec3d.ofCenter(pos), 10f, predict.getValue(), DamageUtils.HIT_FACTORY, false);
+        return DamageUtils.explosionDamage(Mint.mc.player, Vec3.atCenterOf(pos), 10f, predict.getValue(), DamageUtils.HIT_FACTORY, false);
     }
 
     private boolean selfSafe(double self) {
@@ -634,8 +634,8 @@ public class BedAuraModule extends AddonModule {
 
     private boolean bedAvailable() {
         if (swapMode.getValue() == ToggleableSwapType.Off) {
-            return Mint.mc.player.getMainHandStack().getItem() instanceof BedItem
-                    || Mint.mc.player.getOffHandStack().getItem() instanceof BedItem;
+            return Mint.mc.player.getMainHandItem().getItem() instanceof BedItem
+                    || Mint.mc.player.getOffhandItem().getItem() instanceof BedItem;
         }
         return findBedSlot() != -1;
     }
@@ -651,10 +651,10 @@ public class BedAuraModule extends AddonModule {
     }
 
     private BlockHitResult computeBedFace(BlockPos pos) {
-        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
         boolean grim = antiCheat.getValue() == InteractionMode.Grim;
         double reach = Math.max(range.getValue(), wallsRange.getValue());
-        Vec3d center = Vec3d.ofCenter(pos);
+        Vec3 center = Vec3.atCenterOf(pos);
 
         BlockHitResult best = null;
         double bestDist = Double.MAX_VALUE;
@@ -662,9 +662,9 @@ public class BedAuraModule extends AddonModule {
         double fallbackDist = Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            Vec3d normal = new Vec3d(dir.getUnitVector());
-            Vec3d face = center.add(normal.multiply(0.5));
-            if (eye.subtract(face).dotProduct(normal) <= 0) continue; // back-face cull
+            Vec3 normal = new Vec3(dir.getUnitVec3i());
+            Vec3 face = center.add(normal.scale(0.5));
+            if (eye.subtract(face).dot(normal) <= 0) continue; // back-face cull
 
             double dist = face.distanceTo(eye);
             if (!grim && dist > reach) continue;
@@ -688,21 +688,21 @@ public class BedAuraModule extends AddonModule {
 
     private boolean withinReach(BlockPos pos, double reach) {
         if (antiCheat.getValue() == InteractionMode.Grim) return true;
-        return Vec3d.ofCenter(pos).distanceTo(EntityHelper.getEyePos(Mint.mc.player)) <= reach + 0.5;
+        return Vec3.atCenterOf(pos).distanceTo(EntityHelper.getEyePos(Mint.mc.player)) <= reach + 0.5;
     }
 
     private void updateTargets() {
         targets.clear();
-        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
 
         List<LivingEntity> found = new ArrayList<>();
-        for (Entity entity : Mint.mc.world.getEntities()) {
-            if (!(entity instanceof PlayerEntity le)) continue;
+        for (Entity entity : Mint.mc.level.entitiesForRendering()) {
+            if (!(entity instanceof Player le)) continue;
             if (le == Mint.mc.player) continue;
             if (EntityHelper.isFriend(le)) continue;
             if (!EntityHelper.isAlive(le)) continue;
             if (EntityHelper.getHealth(le) <= 0) continue;
-            if (Vec3d.ofCenter(le.getBlockPos()).distanceTo(eye) > targetRange.getValue()
+            if (Vec3.atCenterOf(le.blockPosition()).distanceTo(eye) > targetRange.getValue()
                     && le.distanceTo(Mint.mc.player) > targetRange.getValue()) continue;
             found.add(le);
         }

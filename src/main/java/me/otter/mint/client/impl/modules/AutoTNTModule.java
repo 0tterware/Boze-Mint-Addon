@@ -11,13 +11,13 @@ import dev.boze.api.utility.interaction.*;
 import me.otter.mint.Mint;
 import me.otter.mint.client.core.feature.RenderSettings;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 
@@ -69,7 +69,7 @@ public class AutoTNTModule extends AddonModule {
     }
 
     private boolean canAttemptPlace() {
-        if (Mint.mc.player == null || Mint.mc.world == null) return false;
+        if (Mint.mc.player == null || Mint.mc.level == null) return false;
         return !onlyStill.getValue() || !EntityHelper.isMoving(Mint.mc.player);
     }
 
@@ -82,13 +82,13 @@ public class AutoTNTModule extends AddonModule {
         long now = System.currentTimeMillis();
         recentPlacements.entrySet().removeIf(entry -> now - entry.getValue() > PLACEMENT_MEMORY_MS);
 
-        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        final Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
         final double max = placeRange.getValue();
         final double effMin = MathHelper.clamp(minDistance.getValue(), 0.0, max);
         final double maxSq = max * max;
         final double minSq = effMin * effMin;
 
-        final BlockPos base = Mint.mc.player.getBlockPos();
+        final BlockPos base = Mint.mc.player.blockPosition();
         final int r = (int) Math.ceil(max);
         final int hSpread = horizontalSpread.getValue().intValue();
         final int vSpread = verticalSpread.getValue().intValue();
@@ -96,11 +96,11 @@ public class AutoTNTModule extends AddonModule {
         for (int ox = -r; ox <= r; ox++) {
             for (int oy = -r; oy <= r; oy++) {
                 for (int oz = -r; oz <= r; oz++) {
-                    BlockPos pos = base.add(ox, oy, oz);
+                    BlockPos pos = base.offset(ox, oy, oz);
 
                     // distance ring
-                    Vec3d center = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-                    double distSq = center.squaredDistanceTo(eye);
+                    Vec3 center = new Vec3(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                    double distSq = center.distanceToSqr(eye);
                     if (distSq > maxSq || distSq < minSq) continue;
 
                     // world checks
@@ -131,7 +131,7 @@ public class AutoTNTModule extends AddonModule {
             for (int sy = -vSpread; sy <= vSpread; sy++) {
                 for (int sz = -hSpread; sz <= hSpread; sz++) {
                     if (sx == 0 && sy == 0 && sz == 0) continue;
-                    if (WorldHelper.getBlockState(pos.add(sx, sy, sz)).isOf(Blocks.TNT)) return true;
+                    if (WorldHelper.getBlockState(pos.offset(sx, sy, sz)).is(Blocks.TNT)) return true;
                 }
             }
         }
@@ -149,18 +149,18 @@ public class AutoTNTModule extends AddonModule {
         return false;
     }
 
-    private void sortCandidates(Vec3d eye) {
+    private void sortCandidates(Vec3 eye) {
         if (sortMode.getValue() == SortMode.Random) {
             Collections.shuffle(candidates, rng);
             return;
         }
 
         candidates.sort((a, b) -> {
-            Vec3d ca = new Vec3d(a.getX() + 0.5, a.getY() + 0.5, a.getZ() + 0.5);
-            Vec3d cb = new Vec3d(b.getX() + 0.5, b.getY() + 0.5, b.getZ() + 0.5);
+            Vec3 ca = new Vec3(a.getX() + 0.5, a.getY() + 0.5, a.getZ() + 0.5);
+            Vec3 cb = new Vec3(b.getX() + 0.5, b.getY() + 0.5, b.getZ() + 0.5);
 
-            double da = ca.squaredDistanceTo(eye);
-            double db = cb.squaredDistanceTo(eye);
+            double da = ca.distanceToSqr(eye);
+            double db = cb.distanceToSqr(eye);
 
             int cmp = Double.compare(da, db);
             if (sortMode.getValue() == SortMode.Furthest) cmp = -cmp;
@@ -179,7 +179,7 @@ public class AutoTNTModule extends AddonModule {
         if (Mint.mc.player == null) return false;
 
         if (swapMode.getValue() == ToggleableSwapType.Off) {
-            return Mint.mc.player.getMainHandStack() != null && Mint.mc.player.getMainHandStack().isOf(Blocks.TNT.asItem());
+            return Mint.mc.player.getMainHandItem() != null && Mint.mc.player.getMainHandItem().is(Blocks.TNT.asItem());
         }
 
         if (swapMode.getValue() == ToggleableSwapType.Alt) {
@@ -190,7 +190,7 @@ public class AutoTNTModule extends AddonModule {
     }
 
     private void tryQueuePlace(EventInteract event) {
-        if (Mint.mc.player == null || Mint.mc.world == null) return;
+        if (Mint.mc.player == null || Mint.mc.level == null) return;
         if (candidates.isEmpty()) return;
 
         if (ticksSincePlace < placeDelay.getValue()) return;
@@ -233,7 +233,7 @@ public class AutoTNTModule extends AddonModule {
         Runnable placeAction = getPlaceAction(tntSlot, hit, winPos);
 
         if (rotate.getValue()) {
-            float[] rot = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), hit.getPos());
+            float[] rot = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), hit.getLocation());
             event.addInteraction(new Interaction(placeAction, rot[0], rot[1]));
         } else {
             event.addInteraction(new Interaction(placeAction));
@@ -249,7 +249,7 @@ public class AutoTNTModule extends AddonModule {
                 InvHelper.swapToSlot(tntSlot, swapMode.getValue());
             }
 
-            PlaceHelper.place(interactionMode.getValue(), hit, Hand.MAIN_HAND);
+            PlaceHelper.place(interactionMode.getValue(), hit, InteractionHand.MAIN_HAND);
 
             if (swapMode.getValue() != ToggleableSwapType.Off && tntSlot != -1) {
                 InvHelper.swapBack();
@@ -269,17 +269,17 @@ public class AutoTNTModule extends AddonModule {
 
     private int countTNT() {
         int count = 0;
-        PlayerInventory inv = Mint.mc.player.getInventory();
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack stack = inv.getStack(i);
-            if (stack.isOf(Blocks.TNT.asItem())) count += stack.getCount();
+        Inventory inv = Mint.mc.player.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack stack = inv.getItem(i);
+            if (stack.is(Blocks.TNT.asItem())) count += stack.getCount();
         }
         return count;
     }
 
     @EventHandler
     private void onInteract(EventInteract event) {
-        if (Mint.mc.player == null || Mint.mc.world == null) return;
+        if (Mint.mc.player == null || Mint.mc.level == null) return;
 
         ticksSincePlace++;
 

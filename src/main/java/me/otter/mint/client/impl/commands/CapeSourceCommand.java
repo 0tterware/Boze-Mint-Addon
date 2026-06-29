@@ -5,7 +5,7 @@ import dev.boze.api.addon.AddonCommand;
 import dev.boze.api.utility.ChatHelper;
 import dev.boze.api.utility.cape.CapesManager;
 import me.otter.mint.Mint;
-import net.minecraft.command.CommandSource;
+import net.minecraft.commands.SharedSuggestionProvider;
 
 import java.util.Random;
 
@@ -18,7 +18,7 @@ public class CapeSourceCommand extends AddonCommand {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<SharedSuggestionProvider> builder) {
         builder.executes(context -> {
             for (String source : CapesManager.getSources()) {
                 ChatHelper.sendMsg("CapeSource", source);

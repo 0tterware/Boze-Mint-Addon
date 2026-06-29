@@ -17,27 +17,27 @@ import me.otter.mint.Mint;
 import me.otter.mint.client.core.feature.RenderSettings;
 import me.otter.mint.client.core.utils.DamageUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.RespawnAnchorBlock;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.client.network.PendingUpdateManager;
-import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.PlayerInput;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RespawnAnchorBlock;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
+import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -157,9 +157,9 @@ public class AnchorAuraModule extends AddonModule {
 
     @EventHandler
     private void onInteract(EventInteract event) {
-        if (Mint.mc.player == null || Mint.mc.world == null) return;
+        if (Mint.mc.player == null || Mint.mc.level == null) return;
         if (event.getMode() != antiCheat.getValue()) return;
-        if (Mint.mc.world.getRegistryKey().getValue().getPath().equals("the_nether")) return;
+        if (Mint.mc.level.dimension().identifier().getPath().equals("the_nether")) return;
         if (!multiTask.getValue() && pauseOnUse.getValue() && Mint.mc.player.isUsingItem()) return;
         if (EntityHelper.getHealth(Mint.mc.player) <= minHealth.getValue()) return;
 
@@ -185,7 +185,7 @@ public class AnchorAuraModule extends AddonModule {
         final BlockHitResult face = computeAnchorFace(spot);
         if (face == null) { resetWork(); return; }
         final BlockState state = WorldHelper.getBlockState(spot);
-        final boolean isAnchor = state.isOf(Blocks.RESPAWN_ANCHOR);
+        final boolean isAnchor = state.is(Blocks.RESPAWN_ANCHOR);
 
         if (isAnchor) workSeenTick = tick;
         else if (workPlaced && tick - workSeenTick > 20) { resetWork(); return; }
@@ -218,7 +218,7 @@ public class AnchorAuraModule extends AddonModule {
 
         // 2) charge
         if (workPlaced && !workCharged) {
-            if (isAnchor && state.get(RespawnAnchorBlock.CHARGES) >= 1) {
+            if (isAnchor && state.getValue(RespawnAnchorBlock.CHARGE) >= 1) {
                 workCharged = true;
                 workChargedTick = tick - (long) Math.ceil(explodeDelay.getValue());   // ready to detonate now
             } else {
@@ -228,7 +228,7 @@ public class AnchorAuraModule extends AddonModule {
                 final int slot = findSlot(Items.GLOWSTONE);
                 steps.add(() -> {
                     if (!canChargeNow(spot, placedNow[0])) return;
-                    if (useOnBlock(slot, face, s -> s.isOf(Items.GLOWSTONE))) chargedNow[0] = true;
+                    if (useOnBlock(slot, face, s -> s.is(Items.GLOWSTONE))) chargedNow[0] = true;
                 });
                 workCharged = true;
                 workChargedTick = tick;
@@ -271,7 +271,7 @@ public class AnchorAuraModule extends AddonModule {
     private void flush(EventInteract event, List<Runnable> steps, BlockPos spot) {
         if (steps.isEmpty()) return;
         Runnable seq = () -> {
-            boolean wasSneaking = Mint.mc.player.isSneaking();
+            boolean wasSneaking = Mint.mc.player.isShiftKeyDown();
             if (wasSneaking) sendSneak(false);
             try {
                 for (Runnable s : steps) s.run();
@@ -279,9 +279,9 @@ public class AnchorAuraModule extends AddonModule {
                 if (wasSneaking) sendSneak(true);
             }
         };
-        Vec3d aim = aimPoint.getValue() == AimPoint.Nearest
-                ? MathHelper.closestPointToBox(EntityHelper.getEyePos(Mint.mc.player), new Box(spot))
-                : Vec3d.ofCenter(spot);
+        Vec3 aim = aimPoint.getValue() == AimPoint.Nearest
+                ? MathHelper.closestPointToBox(EntityHelper.getEyePos(Mint.mc.player), new AABB(spot))
+                : Vec3.atCenterOf(spot);
         addInteraction(event, seq, aim);
     }
 
@@ -291,7 +291,7 @@ public class AnchorAuraModule extends AddonModule {
     }
 
     private boolean pickSpot() {
-        final Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        final Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
         final double exReach = Math.max(range.getValue(), wallsRange.getValue());
         final int r = (int) Math.ceil(anchorRange.getValue());
 
@@ -304,13 +304,13 @@ public class AnchorAuraModule extends AddonModule {
         double bestOtherDmg = -1;
 
         for (LivingEntity target : targets) {
-            BlockPos center = target.getBlockPos();
-            Vec3d targetCenter = target.getBoundingBox().getCenter();
+            BlockPos center = target.blockPosition();
+            Vec3 targetCenter = target.getBoundingBox().getCenter();
             for (int ox = -r; ox <= r; ox++) {
                 for (int oy = -r; oy <= r; oy++) {
                     for (int oz = -r; oz <= r; oz++) {
-                        BlockPos pos = center.add(ox, oy, oz);
-                        Vec3d posCenter = Vec3d.ofCenter(pos);
+                        BlockPos pos = center.offset(ox, oy, oz);
+                        Vec3 posCenter = Vec3.atCenterOf(pos);
                         if (posCenter.distanceTo(targetCenter) > 5.0) continue;   // out of meaningful blast range
                         if (posCenter.distanceTo(eye) > anchorRange.getValue() + 1.5) continue;
                         if (!withinReach(pos, exReach)) continue;
@@ -321,12 +321,12 @@ public class AnchorAuraModule extends AddonModule {
                         if (!passesDamage(dmg, self, target, effMinDamage())) continue;
 
                         BlockState state = WorldHelper.getBlockState(pos);
-                        boolean anchor = state.isOf(Blocks.RESPAWN_ANCHOR);
+                        boolean anchor = state.is(Blocks.RESPAWN_ANCHOR);
                         BlockHitResult placeHit = null;
                         int charges = -1;
 
                         if (anchor) {
-                            charges = state.get(RespawnAnchorBlock.CHARGES);
+                            charges = state.getValue(RespawnAnchorBlock.CHARGE);
                         } else {
                             if (!WorldHelper.isInWorldBounds(pos) || !WorldHelper.isRegionLoaded(pos)) continue;
                             if (!WorldHelper.isReplaceable(pos) || !WorldHelper.canPlaceAt(pos)) continue;
@@ -377,8 +377,8 @@ public class AnchorAuraModule extends AddonModule {
     }
 
     private boolean placeAnchor(int slot, BlockHitResult hit) {
-        return performStep(slot, s -> s.isOf(Blocks.RESPAWN_ANCHOR.asItem()),
-                () -> PlaceHelper.place(antiCheat.getValue(), hit, Hand.MAIN_HAND));
+        return performStep(slot, s -> s.is(Blocks.RESPAWN_ANCHOR.asItem()),
+                () -> PlaceHelper.place(antiCheat.getValue(), hit, InteractionHand.MAIN_HAND));
     }
 
     private boolean placeAnchorAt(int slot, BlockPos spot) {
@@ -396,14 +396,14 @@ public class AnchorAuraModule extends AddonModule {
         if (!validate.getValue()) return true;
         if (placedThisSeq) return true;
         BlockState s = WorldHelper.getBlockState(spot);
-        return s.isOf(Blocks.RESPAWN_ANCHOR) && s.get(RespawnAnchorBlock.CHARGES) < 1;
+        return s.is(Blocks.RESPAWN_ANCHOR) && s.getValue(RespawnAnchorBlock.CHARGE) < 1;
     }
 
     private boolean canDetonateNow(BlockPos spot, boolean chargedThisSeq) {
         if (!validate.getValue()) return true;
         if (chargedThisSeq) return true;
         BlockState s = WorldHelper.getBlockState(spot);
-        return s.isOf(Blocks.RESPAWN_ANCHOR) && s.get(RespawnAnchorBlock.CHARGES) >= 1;
+        return s.is(Blocks.RESPAWN_ANCHOR) && s.getValue(RespawnAnchorBlock.CHARGE) >= 1;
     }
 
     private boolean instantReplaceSafe(BlockPos spot, LivingEntity target) {
@@ -423,7 +423,7 @@ public class AnchorAuraModule extends AddonModule {
         ToggleableSwapType mode = swapMode.getValue();
 
         if (mode == ToggleableSwapType.Off) {
-            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false;
+            if (!heldOk.test(Mint.mc.player.getMainHandItem())) return false;
             action.run();
             return true;
         }
@@ -439,10 +439,10 @@ public class AnchorAuraModule extends AddonModule {
         // Silent / Alt
         boolean swapped = InvHelper.swapToSlot(slot, mode);
         if (!swapped) {
-            if (!heldOk.test(Mint.mc.player.getMainHandStack())) return false;
-            if (Mint.mc.getNetworkHandler() != null) {
-                Mint.mc.getNetworkHandler().sendPacket(
-                        new UpdateSelectedSlotC2SPacket(Mint.mc.player.getInventory().getSelectedSlot()));
+            if (!heldOk.test(Mint.mc.player.getMainHandItem())) return false;
+            if (Mint.mc.getConnection() != null) {
+                Mint.mc.getConnection().send(
+                        new ServerboundSetCarriedItemPacket(Mint.mc.player.getInventory().getSelectedSlot()));
             }
         }
         try {
@@ -457,24 +457,24 @@ public class AnchorAuraModule extends AddonModule {
         try {
             sendInteract(hit);
         } catch (Throwable t) {
-            Mint.mc.interactionManager.interactBlock(Mint.mc.player, Hand.MAIN_HAND, hit);
+            Mint.mc.gameMode.useItemOn(Mint.mc.player, InteractionHand.MAIN_HAND, hit);
         }
-        Mint.mc.player.swingHand(Hand.MAIN_HAND);
+        Mint.mc.player.swing(InteractionHand.MAIN_HAND);
     }
 
     private void sendInteract(BlockHitResult hit) {
-        if (Mint.mc.getNetworkHandler() == null || Mint.mc.world == null) return;
-        try (PendingUpdateManager pum = Mint.mc.world.getPendingUpdateManager().incrementSequence()) {
-            Mint.mc.getNetworkHandler().sendPacket(
-                    new PlayerInteractBlockC2SPacket(Hand.MAIN_HAND, hit, pum.getSequence()));
+        if (Mint.mc.getConnection() == null || Mint.mc.level == null) return;
+        try (BlockStatePredictionHandler pum = ((me.otter.mint.mixin.ClientLevelInvoker) Mint.mc.level).mint$getBlockStatePredictionHandler().startPredicting()) {
+            Mint.mc.getConnection().send(
+                    new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, hit, pum.currentSequence()));
         }
     }
 
     private void sendSneak(boolean sneaking) {
-        if (Mint.mc.getNetworkHandler() == null) return;
-        PlayerInput cur = Mint.mc.player.input.playerInput;
-        PlayerInput modified = new PlayerInput(cur.forward(), cur.backward(), cur.left(), cur.right(), cur.jump(), sneaking, cur.sprint());
-        Mint.mc.getNetworkHandler().sendPacket(new PlayerInputC2SPacket(modified));
+        if (Mint.mc.getConnection() == null) return;
+        Input cur = Mint.mc.player.input.keyPresses;
+        Input modified = new Input(cur.forward(), cur.backward(), cur.left(), cur.right(), cur.jump(), sneaking, cur.sprint());
+        Mint.mc.getConnection().send(new ServerboundPlayerInputPacket(modified));
     }
 
     @EventHandler
@@ -489,7 +489,7 @@ public class AnchorAuraModule extends AddonModule {
         return overrideHeld ? overrideMinDmg.getValue() : minDamage.getValue();
     }
 
-    private void addInteraction(EventInteract event, Runnable action, Vec3d aim) {
+    private void addInteraction(EventInteract event, Runnable action, Vec3 aim) {
         if (rotate.getValue()) {
             float[] rot = MathHelper.calculateRotation(EntityHelper.getEyePos(Mint.mc.player), aim);
             event.addInteraction(new Interaction(action, rot[0], rot[1]));
@@ -500,11 +500,11 @@ public class AnchorAuraModule extends AddonModule {
 
     // damage helpers
     private double enemyDamage(LivingEntity target, BlockPos pos) {
-        return DamageUtils.anchorDamage(target, Vec3d.ofCenter(pos), predict.getValue(), assumeMaxArmor.getValue());
+        return DamageUtils.anchorDamage(target, Vec3.atCenterOf(pos), predict.getValue(), assumeMaxArmor.getValue());
     }
 
     private double selfDamage(BlockPos pos) {
-        return DamageUtils.anchorDamage(Mint.mc.player, Vec3d.ofCenter(pos), predict.getValue());
+        return DamageUtils.anchorDamage(Mint.mc.player, Vec3.atCenterOf(pos), predict.getValue());
     }
 
     private boolean selfSafe(double self) {
@@ -519,7 +519,7 @@ public class AnchorAuraModule extends AddonModule {
     }
 
     //inventory helpers
-    private int findSlot(net.minecraft.item.Item item) {
+    private int findSlot(net.minecraft.world.item.Item item) {
         return swapMode.getValue() == ToggleableSwapType.Alt ? InvHelper.find(item) : InvHelper.findInHotbar(item);
     }
 
@@ -535,7 +535,7 @@ public class AnchorAuraModule extends AddonModule {
 
     private boolean detonateAvailable() {
         if (swapMode.getValue() == ToggleableSwapType.Off) {
-            ItemStack main = Mint.mc.player.getMainHandStack();
+            ItemStack main = Mint.mc.player.getMainHandItem();
             return main.isEmpty() || main.getItem() != Items.GLOWSTONE;
         }
         return findDetonateSlot() != Integer.MIN_VALUE;
@@ -552,16 +552,16 @@ public class AnchorAuraModule extends AddonModule {
         return any != -1 ? any : Integer.MIN_VALUE;
     }
 
-    private boolean holding(net.minecraft.item.Item item) {
-        return Mint.mc.player.getMainHandStack().getItem() == item
-                || Mint.mc.player.getOffHandStack().getItem() == item;
+    private boolean holding(net.minecraft.world.item.Item item) {
+        return Mint.mc.player.getMainHandItem().getItem() == item
+                || Mint.mc.player.getOffhandItem().getItem() == item;
     }
 
     private BlockHitResult computeAnchorFace(BlockPos pos) {
-        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
         boolean grim = antiCheat.getValue() == InteractionMode.Grim;
         double reach = Math.max(range.getValue(), wallsRange.getValue());
-        Vec3d center = Vec3d.ofCenter(pos);
+        Vec3 center = Vec3.atCenterOf(pos);
 
         BlockHitResult best = null;
         double bestDist = Double.MAX_VALUE;
@@ -569,9 +569,9 @@ public class AnchorAuraModule extends AddonModule {
         double fallbackDist = Double.MAX_VALUE;
 
         for (Direction dir : Direction.values()) {
-            Vec3d normal = new Vec3d(dir.getUnitVector());
-            Vec3d face = center.add(normal.multiply(0.5));
-            if (eye.subtract(face).dotProduct(normal) <= 0) continue; // back-face cull
+            Vec3 normal = new Vec3(dir.getUnitVec3i());
+            Vec3 face = center.add(normal.scale(0.5));
+            if (eye.subtract(face).dot(normal) <= 0) continue; // back-face cull
 
             double dist = face.distanceTo(eye);
             if (!grim && dist > reach) continue;
@@ -595,21 +595,21 @@ public class AnchorAuraModule extends AddonModule {
 
     private boolean withinReach(BlockPos pos, double range) {
         if (antiCheat.getValue() == InteractionMode.Grim) return true;
-        return Vec3d.ofCenter(pos).distanceTo(EntityHelper.getEyePos(Mint.mc.player)) <= range + 0.5;
+        return Vec3.atCenterOf(pos).distanceTo(EntityHelper.getEyePos(Mint.mc.player)) <= range + 0.5;
     }
 
     private void updateTargets() {
         targets.clear();
-        Vec3d eye = EntityHelper.getEyePos(Mint.mc.player);
+        Vec3 eye = EntityHelper.getEyePos(Mint.mc.player);
 
         List<LivingEntity> found = new ArrayList<>();
-        for (Entity entity : Mint.mc.world.getEntities()) {
-            if (!(entity instanceof PlayerEntity le)) continue;
+        for (Entity entity : Mint.mc.level.entitiesForRendering()) {
+            if (!(entity instanceof Player le)) continue;
             if (le == Mint.mc.player) continue;
             if (EntityHelper.isFriend(le)) continue;
             if (!EntityHelper.isAlive(le)) continue;
             if (EntityHelper.getHealth(le) <= 0) continue;
-            if (Vec3d.ofCenter(le.getBlockPos()).distanceTo(eye) > targetRange.getValue()
+            if (Vec3.atCenterOf(le.blockPosition()).distanceTo(eye) > targetRange.getValue()
                     && le.distanceTo(Mint.mc.player) > targetRange.getValue()) continue;
             found.add(le);
         }

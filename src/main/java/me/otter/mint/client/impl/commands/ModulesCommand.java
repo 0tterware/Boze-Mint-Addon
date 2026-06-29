@@ -5,7 +5,7 @@ import dev.boze.api.addon.AddonCommand;
 import dev.boze.api.addon.AddonModule;
 import dev.boze.api.utility.ChatHelper;
 import me.otter.mint.Mint;
-import net.minecraft.command.CommandSource;
+import net.minecraft.commands.SharedSuggestionProvider;
 
 public class ModulesCommand extends AddonCommand {
 
@@ -14,7 +14,7 @@ public class ModulesCommand extends AddonCommand {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<SharedSuggestionProvider> builder) {
         builder.executes(context -> {
             for (AddonModule module : Mint.INSTANCE.modules) {
                 ChatHelper.sendMsg(module.getName() + " | " + module.getDescription());

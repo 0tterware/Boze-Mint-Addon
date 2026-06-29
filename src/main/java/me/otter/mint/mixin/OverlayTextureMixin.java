@@ -1,12 +1,12 @@
 package me.otter.mint.mixin;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import dev.boze.api.render.ClientColor;
 import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.impl.extentions.WorldTweaksExtension;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -25,7 +25,7 @@ public abstract class OverlayTextureMixin {
 
     @Shadow
     @Final
-    private NativeImageBackedTexture texture;
+    private DynamicTexture texture;
 
     @Unique
     private int applied = VANILLA_HURT;
@@ -44,12 +44,12 @@ public abstract class OverlayTextureMixin {
 
         if (argb == applied) return;
 
-        NativeImage image = texture.getImage();
+        NativeImage image = texture.getPixels();
         if (image == null) return;
 
         for (int v = 0; v < 8; v++) {
             for (int u = 0; u < 16; u++) {
-                image.setColorArgb(u, v, argb);
+                image.setPixel(u, v, argb);
             }
         }
 

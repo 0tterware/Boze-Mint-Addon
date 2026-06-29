@@ -3,15 +3,15 @@ package me.otter.mint.mixin;
 import dev.boze.api.render.ClientColor;
 import me.otter.mint.client.core.feature.FeatureManager;
 import me.otter.mint.client.impl.extentions.WorldTweaksExtension;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderLayers;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-@Mixin(RenderLayer.class)
+@Mixin(RenderType.class)
 public abstract class RenderLayerMixin {
 
     // because why would it be straight forward...
@@ -23,13 +23,13 @@ public abstract class RenderLayerMixin {
         method = "draw",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gl/DynamicUniforms;write(Lorg/joml/Matrix4fc;Lorg/joml/Vector4fc;Lorg/joml/Vector3fc;Lorg/joml/Matrix4fc;)Lcom/mojang/blaze3d/buffers/GpuBufferSlice;"),
+            target = "Lnet/minecraft/client/renderer/DynamicUniforms;writeTransform(Lorg/joml/Matrix4fc;Lorg/joml/Vector4fc;Lorg/joml/Vector3fc;Lorg/joml/Matrix4fc;)Lcom/mojang/blaze3d/buffers/GpuBufferSlice;"),
         index = 1
     )
     private Vector4fc recolorGlint(Vector4fc colorModulator) {
-        RenderLayer self = (RenderLayer) (Object) this;
-        if (self != RenderLayers.glint() && self != RenderLayers.entityGlint()
-            && self != RenderLayers.glintTranslucent() && self != RenderLayers.armorEntityGlint()) {
+        RenderType self = (RenderType) (Object) this;
+        if (self != RenderTypes.glint() && self != RenderTypes.entityGlint()
+            && self != RenderTypes.glintTranslucent() && self != RenderTypes.armorEntityGlint()) {
             return colorModulator;
         }
 
