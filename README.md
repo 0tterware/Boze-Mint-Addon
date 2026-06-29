@@ -2,12 +2,18 @@
 
 An addon for the [Boze](https://boze.dev) Minecraft client.
 
+Minecraft 26.1.2
+
 ## Features
 
 **Modules**
 - `AnchorAura` - automatically attacks enemies using respawn anchor explosions
 - `AutoTNT` - automatically places TNT around you
 - `AutoWither` - automatically builds withers
+
+**HUD**
+- `MintWaterMark` - shows the Mint name and version watermark
+- `Durability` - shows armor durability for each armor piece
 
 **Extensions**
 - `WorldESP`
@@ -23,6 +29,7 @@ An addon for the [Boze](https://boze.dev) Minecraft client.
   - `Main Hand Progress` / `Off Hand Progress`
 - `AutoCrystal`
   - `TargetRender`
+  - `TargetLine`
 - `Options`
   - `InstantPrefix`
   - `CmdHighlight`
